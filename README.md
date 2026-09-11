@@ -11,6 +11,10 @@ Acting as Data Analysts within the risk department of **"CREDIT AUTO EUROPE"**, 
 
 The goal is to provide a rigorous and automated audit trail evaluating risk governance, accounting standards (IFRS 9 / Basel Committee), and financial data integrity.
 
+## 🏗️ Overall Architecture
+
+*(Overview of the data structure and analysis process)*
+
 ```mermaid 
 graph TD
     %% Source
@@ -19,7 +23,7 @@ graph TD
     %% Audit des 6 dimensions
     B --> C[Audit Qualité des Données]:::light
     
-    C --> D[1. Complétude & Unicité]:::purple
+    C --> D[1. Complétude et Unicité]:::purple
     C --> E[2. Validité des domaines]:::purple
     C --> F[3. Cohérences inter-champs & Métier]:::purple
     C --> G[4. Cohérence temporelle]:::purple
