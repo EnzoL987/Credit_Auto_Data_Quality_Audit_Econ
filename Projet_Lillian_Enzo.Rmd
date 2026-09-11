@@ -79,7 +79,8 @@ head(df)
 # On change le format de date
 
 df <- df %>%
-  mutate(origination_date = ymd(origination_date))
+  mutate(origination_date = ymd(origination_date),
+         employment_start_date = ymd(employment_start_date))
 
 head(df)
 ```
@@ -162,7 +163,7 @@ if(length(colonnes_avec_na) == 0) {
 ```{r}
 # Vérification des chaînes de caractères vides ("")
 vides_counts <- colSums(df == "", na.rm = TRUE)
-colonnes_vides <- empty_counts[empty_counts > 0]
+colonnes_vides <- vides_counts[vides_counts > 0]
 
 if(length(colonnes_vides) == 0) {
   print("Aucune chaîne de caractères vide détecté, on peut commencer notre audit.")
@@ -337,6 +338,61 @@ erreurs_km_neuf <- df %>%
 pct_km_neuf <- round((erreurs_km_neuf / nb_lignes_totales) * 100, 4)
 print(paste0("Incohérences Véhicule Neuf (KM > 100) : ", erreurs_km_neuf, " soit ", pct_km_neuf, "%"))
 ```
+
+
+```{r}
+# Détection des deux types d'incohérences
+anomalies_defaut <- df %>%
+  mutate(
+    type_incoherence_defaut = case_when(
+      days_past_due >= 90 & default_flag == 0 ~ "Sous-estimation : DPD >= 90 mais Flag = 0",
+      days_past_due < 90  & default_flag == 1 ~ "Sur-estimation : DPD < 90 mais Flag = 1",
+      TRUE ~ "Conforme"
+    )
+  )
+
+# Quantification globale et par typologie
+bilan_defaut <- anomalies_defaut %>%
+  group_by(type_incoherence_defaut) %>%
+  summarise(
+    nb_contrats = n(),
+    pct_base    = round((n() / nrow(df)) * 100, 4)
+  ) %>%
+  arrange(desc(nb_contrats))
+
+print(bilan_defaut)
+
+# Isolation des lignes problématiques pour la visualisation
+lignes_erreurs_defaut <- anomalies_defaut %>%
+  filter(type_incoherence_defaut != "Conforme") %>%
+  select(loan_id, origination_date, days_past_due, default_flag, type_incoherence_defaut)
+
+# Nombre total de lignes en défaut de qualité
+nb_incoherences_defaut <- nrow(lignes_erreurs_defaut)
+pct_incoherences_defaut <- round((nb_incoherences_defaut / nrow(df)) * 100, 4)
+
+cat(paste0("Total des anomalies de statut de défaut : ", 
+  nb_incoherences_defaut, " lignes (", pct_incoherences_defaut, "% du portefeuille)."
+))
+```
+
+```{r}
+# Aperçu des lignes problématiques à intégrer au PDF
+lignes_erreurs_defaut %>%
+  group_by(type_incoherence_defaut) %>%
+  slice_head(n = 3) %>%
+  ungroup() %>%
+  knitr::kable(
+    caption = "Échantillon de contrats avec incohérence statut de défaut / jours de retard",
+    col.names = c("Loan ID", "Date d'octroi", "Jours de retard (DPD)", "Default Flag", "Typologie d'anomalie")
+  )
+```
+
+
+
+
+
+
 
 Regardon à présent les Cohérence Métier :
 
