@@ -48,3 +48,5 @@ The audit is structured around the 6 regulatory data quality dimensions:
 1. Clone this repository:
    ```bash
    git clone [https://github.com/your-username/your-repo-name.git](https://github.com/your-username/your-repo-name.git)
+
+🌍 Note : The final PDF report Projet_Sans_Code.pdf is written in French. However, I would be more than happy to discuss the methodology, the code, or the results in English! Feel free to reach out.
