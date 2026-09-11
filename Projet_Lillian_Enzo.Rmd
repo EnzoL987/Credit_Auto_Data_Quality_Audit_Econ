@@ -220,14 +220,210 @@ if (nb_lignes_dupliquees == 0) {
 ```
 
 
+Cherchons si il y a des anomalies aux niveaux des Catégories annoncées :
+
+
+```{r}
+nb_lignes_totales <- nrow(df)
+
+# Vérification des variables catégorielles :
+
+# Définition des valeurs autorisées selon le dictionnaire
+pays_autorises <- c("France", "Allemagne", "Italie", "Espagne", "Belgique", "Pays-Bas", "Portugal", "Pologne", "Autriche", "Irlande")
+genres_autorises <- c("M", "F")
+statuts_maritaux_autorises <- c("Célibataire", "Marié(e)", "Divorcé(e)", "Veuf(ve)")
 
 
 
+# Comptage des anomalies 
+
+erreurs_pays <- df %>% 
+  filter(!country %in% pays_autorises) %>% 
+  nrow()
+
+erreurs_genre <- df %>% 
+  filter(!borrower_gender %in% genres_autorises) %>% 
+  nrow()
+
+erreurs_marital <- df %>% 
+  filter(!marital_status %in% statuts_maritaux_autorises) %>% 
+  nrow()
+
+# Affichage des résultats avec pourcentages
+print(paste0("Anomalies Pays : ", erreurs_pays, " soit ", round((erreurs_pays/nb_lignes_totales)*100, 4), "%"))
+print(paste0("Anomalies Genre : ", erreurs_genre, " soit ", round((erreurs_genre/nb_lignes_totales)*100, 4), "%"))
+print(paste0("Anomalies Statut marital : ", erreurs_marital, " soit ", round((erreurs_marital/nb_lignes_totales)*100, 4), "%"))
+```
+
+Maintenant les anomalies aux niveaux des Catégories Numériques annoncées :
+
+
+```{r}
+# Vérification des variables numériques :
+
+# L'âge doit être compris entre 18 et 80 ans.
+erreurs_age <- df %>% 
+  filter(borrower_age < 18 | borrower_age > 80) %>% 
+  nrow()
+
+# Le revenu net mensuel doit être entre 750 et 15 000 euros
+erreurs_revenu <- df %>% 
+  filter(monthly_net_income < 750 | monthly_net_income > 15000) %>% 
+  nrow()
+
+
+# Ancienneté dans l'emploi (doit être entre 0 et 45 ans)
+erreurs_anciennete <- df %>% 
+  filter(job_seniority_years < 0 | job_seniority_years > 45) %>% 
+  nrow()
+
+
+print(paste0("Anomalies Âge : ", erreurs_age, " soit ", round((erreurs_age/nb_lignes_totales)*100, 4), "%"))
+print(paste0("Anomalies Revenu : ", erreurs_revenu, " soit ", round((erreurs_revenu/nb_lignes_totales)*100, 4), "%"))
+print(paste0("Anomalies Ancienneté : ", erreurs_anciennete, " soit ", round((erreurs_anciennete/nb_lignes_totales)*100, 4), "%"))
+```
+
+
+Regardons à présent les Cohérences Inter-Champs :
+
+
+```{r}
+# Cohérence financière : Montant du prêt vs Prix et Apport : 
+
+# Le montant financé doit logiquement être le prix du véhicule moins l'apport
+# On utilise abs() < 1 pour ignorer les arrondis inutiles
+erreurs_montant <- df %>% 
+  filter(abs(loan_amount - (vehicle_price - down_payment_amount)) > 1) %>% 
+  nrow()
+
+pct_montant <- round((erreurs_montant / nb_lignes_totales) * 100, 4)
+print(paste0("Incohérences Montant du prêt : ", erreurs_montant, " soit ", pct_montant, "%"))
 
 
 
+# Cohérence financière : Ratio LTV (Loan-to-Value) :
+
+# Le ltv_ratio doit être égal à loan_amount / vehicle_price
+# On tolère un petit écart d'arrondi (0.01)
+erreurs_ltv <- df %>% 
+  filter(abs(ltv_ratio - (loan_amount / vehicle_price)) > 0.01) %>% 
+  nrow()
+
+pct_ltv <- round((erreurs_ltv / nb_lignes_totales) * 100, 4)
+print(paste0("Incohérences Ratio LTV : ", erreurs_ltv, " soit ", pct_ltv, "%"))
 
 
+
+# Cohérence Véhicule : État "Neuf" vs Âge :
+
+# Un véhicule neuf doit avoir 0 an
+erreurs_age_neuf <- df %>% 
+  filter(vehicle_condition == "Neuf" & vehicle_age_years > 0) %>% 
+  nrow()
+
+pct_age_neuf <- round((erreurs_age_neuf / nb_lignes_totales) * 100, 4)
+print(paste0("Incohérences Véhicule Neuf (Âge > 0) : ", erreurs_age_neuf, " soit ", pct_age_neuf, "%"))
+
+
+
+# Cohérence Véhicule : État "Neuf" vs Kilométrage :
+
+# Le dictionnaire indique 0 ± quelques dizaines de km pour un véhicule neuf
+# On fixe un seuil de tolérance logique, par exemple 100 km maximum
+erreurs_km_neuf <- df %>% 
+  filter(vehicle_condition == "Neuf" & vehicle_mileage_km > 100) %>% 
+  nrow()
+
+pct_km_neuf <- round((erreurs_km_neuf / nb_lignes_totales) * 100, 4)
+print(paste0("Incohérences Véhicule Neuf (KM > 100) : ", erreurs_km_neuf, " soit ", pct_km_neuf, "%"))
+```
+
+Regardon à présent les Cohérence Métier :
+
+
+```{r}
+# Plausibilité : Âge vs Statut "Retraité" :
+
+# Justification du seuil : Il est très improbable d'être retraité avant 55 ans.
+erreurs_retraite <- df %>% 
+  filter(employment_status == "Retraité" & borrower_age < 55) %>% 
+  nrow()
+
+pct_retraite <- round((erreurs_retraite / nb_lignes_totales) * 100, 4)
+print(paste0("Invraisemblances Retraité (Âge < 55 ans) : ", erreurs_retraite, " soit ", pct_retraite, "%"))
+
+
+# Plausibilité : Âge de début d'activité (Âge - Ancienneté) :
+
+# Justification du seuil : L'âge de l'emprunteur moins son ancienneté donne l'âge de début 
+# de son contrat actuel. Commencer avant 16 ans légalement est très suspect.
+erreurs_age_travail <- df %>% 
+  filter((borrower_age - job_seniority_years) < 16) %>% 
+  nrow()
+
+pct_age_travail <- round((erreurs_age_travail / nb_lignes_totales) * 100, 4)
+print(paste0("Invraisemblances Début emploi (< 16 ans) : ", erreurs_age_travail, " soit ", pct_age_travail, "%"))
+
+
+# Plausibilité : Sans emploi avec très hauts revenu :
+
+# Justification du seuil : Un "Sans emploi" avec un revenu net supérieur à 4000€ ou 5000€ 
+# est une situation atypique méritant d'être auditée. Fixons le seuil d'alerte à 5000€.
+erreurs_chomeur_riche <- df %>% 
+  filter(employment_status == "Sans emploi" & monthly_net_income > 5000) %>% 
+  nrow()
+
+pct_chomeur_riche <- round((erreurs_chomeur_riche / nb_lignes_totales) * 100, 4)
+print(paste0("Invraisemblances Sans emploi (> 5000€/mois) : ", erreurs_chomeur_riche, " soit ", pct_chomeur_riche, "%"))
+```
+
+On passe finalement aux Cohérences Temporelles : 
+
+```{r}
+# Si les dates sont reconnues comme des caractères à l'importation, 
+# on force leur conversion en format Date au préalable
+df <- df %>%
+  mutate(
+    origination_date = as.Date(origination_date),
+    employment_start_date = as.Date(employment_start_date)
+  )
+
+# Période d'octroi du crédit (origination_date) :
+# La date doit être comprise entre le 01/01/2020 et le 31/12/2022
+date_min <- as.Date("2020-01-01")
+date_max <- as.Date("2022-12-31")
+
+erreurs_date_octroi <- df %>% 
+  filter(origination_date < date_min | origination_date > date_max) %>% 
+  nrow()
+
+pct_date_octroi <- round((erreurs_date_octroi / nb_lignes_totales) * 100, 4)
+print(paste0("Incohérences Période d'octroi (hors 2020-2022) : ", erreurs_date_octroi, " soit ", pct_date_octroi, "%"))
+
+
+# Chronologie Logique : Date d'emploi vs Date de crédit :
+# L'emprunteur doit avoir commencé son emploi AVANT de demander le crédit
+erreurs_chronologie <- df %>% 
+  filter(employment_start_date >= origination_date) %>% 
+  nrow()
+
+pct_chronologie <- round((erreurs_chronologie / nb_lignes_totales) * 100, 4)
+print(paste0("Incohérences Chronologie (Emploi débuté après le crédit) : ", erreurs_chronologie, " soit ", pct_chronologie, "%"))
+
+
+# Cohérence Temporelle : Ancienneté déclarée vs Dates
+# L'écart entre employment_start_date et origination_date doit correspondre à job_seniority_years.
+# On calcule l'écart en jours divisé par 365.25, en tolérant une marge d'erreur d'arrondi de 0.5 an.
+erreurs_calcul_anciennete <- df %>% 
+  mutate(
+    anciennete_reelle = as.numeric(difftime(origination_date, employment_start_date, units = "days")) / 365.25
+  ) %>% 
+  filter(abs(anciennete_reelle - job_seniority_years) > 0.5) %>% 
+  nrow()
+
+pct_calcul_anciennete <- round((erreurs_calcul_anciennete / nb_lignes_totales) * 100, 4)
+print(paste0("Incohérences Dates vs Ancienneté déclarée : ", erreurs_calcul_anciennete, " soit ", pct_calcul_anciennete, "%"))
+```
 
 
 
