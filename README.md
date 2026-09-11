@@ -11,6 +11,36 @@ Acting as Data Analysts within the risk department of **"CREDIT AUTO EUROPE"**, 
 
 The goal is to provide a rigorous and automated audit trail evaluating risk governance, accounting standards (IFRS 9 / Basel Committee), and financial data integrity.
 
+```mermaid 
+graph TD
+    %% Source
+    A[(Base Crédit Auto<br/>800k+ lignes)]:::blue --> B[Import et Typage des données]:::white
+
+    %% Audit des 6 dimensions
+    B --> C[Audit Qualité des Données]:::light
+    
+    C --> D[1. Complétude & Unicité]:::purple
+    C --> E[2. Validité des domaines]:::purple
+    C --> F[3. Cohérences inter-champs & Métier]:::purple
+    C --> G[4. Cohérence temporelle]:::purple
+
+    %% Rapport
+    D --> H[Rapport d'audit<br/>Régulateur]:::white
+    E --> H
+    F --> H
+    G --> H
+
+    %% Livrable final / Recommandations
+    H --> I((Propositions de<br/>changements)):::green
+
+    %% Styles
+    classDef blue fill:#1a8cff,stroke:#000,stroke-width:1px,color:#fff;
+    classDef white fill:#ffffff,stroke:#333,stroke-width:1px,color:#000;
+    classDef light fill:#e6f0ff,stroke:#333,stroke-width:1px,color:#000;
+    classDef purple fill:#b366ff,stroke:#333,stroke-width:1px,color:#fff;
+    classDef green fill:#00cc99,stroke:#000,stroke-width:2px,color:#fff;
+```
+
 ## 🎯 Audit Scope and Quality Dimensions
 
 The audit is structured around the 6 regulatory data quality dimensions:
