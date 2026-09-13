@@ -99,45 +99,6 @@ summary(df)
 str(df)
 ```
 
-```{r}
-# On commence avec la colonne age
-
-hist(df$borrower_age,
-     col = "pink")
-```
-
-
-```{r}
-# La colonne de kilometrage
-
-min(df$vehicle_mileage_km)
-
-hist(df$vehicle_mileage_km,
-     col = "brown", 
-     breaks = 20)
-```
-
-```{r}
-# La colonne des apports
-
-hist(df$down_payment_amount,
-     col = "green")
-```
-
-```{r}
-# La colonne des taux d'intérêts
-
-hist(df$interest_rate_pct, 
-     col = "blue")
-```
-
-```{r}
-# Pour les payements mensuels
-
-hist(df$monthly_installment, 
-     col = "Purple")
-```
-
 
 
 On va commencer par s'intéresser à la partie de la Complétude, où l'on va analyser les potentilles valeurs manquantes:
@@ -437,6 +398,8 @@ print(paste0("Incohérences Ratio LTV : ", erreurs_ltv, " soit ", pct_ltv, "%"))
 ```
 
 
+
+
 ```{r}
 # Cohérence Véhicule : 
 
@@ -613,9 +576,90 @@ print(paste0("Incohérences Dates vs Ancienneté déclarée : ", erreurs_calcul_
 ```
 
 
+Visualisation de comment sont répartis les erreurs : (ajouter toutes les variables où il y a des erreurs)
+
+
+```{r}
+# Création d'un dataframe récapitulatif des erreurs :
+
+bilans_erreurs <- data.frame(
+  indicateur = c("Âge (<18 ou >80)", "Revenu hors normes", "Ratio LTV aberrant", "Chronologie Emploi"),
+  
+  # On donne les valeurs qu'on a optenu :
+  
+  pct_anomalie = c(round((erreurs_age/nb_lignes_totales)*100, 2), 
+                   round((erreurs_revenu/nb_lignes_totales)*100, 2),
+                   round((erreurs_ltv/nb_lignes_totales)*100, 2),
+                   round((erreurs_chronologie/nb_lignes_totales)*100, 2))) %>% 
+  filter(pct_anomalie > 0) # On garde que les problématiques
+
+ggplot(bilans_erreurs, aes(x = reorder(indicateur, pct_anomalie), y = pct_anomalie)) +
+  geom_col(fill = "lightblue") +
+  ylim(0,3) + # Bug sur l'affichage des % donc j'ajuste
+  coord_flip() +
+  geom_text(aes(label = paste0(pct_anomalie, "%")), hjust = -0.2, size = 3.5) + # Affichage des %
+  labs(title = "Top des anomalies détectées sur les variables numériques",
+       x = "", y = "% de lignes touchées") +
+  theme_minimal()
+```
+
+
+Visualisation de l'Apport vs Prix de la voiture
+
+```{r}
+# On isole toutes les anomalies
+df_anomalies <- df %>% filter(down_payment_amount >= vehicle_price)
+
+# On prend un échantillon aléatoire de 1% des données conformes
+df_conformes_sample <- df %>% 
+  filter(down_payment_amount < vehicle_price) %>% 
+  sample_frac(0.01) # Garde 1% des lignes pour alléger le graphique
+
+# On recombine les deux
+df_echantillon <- bind_rows(df_anomalies, df_conformes_sample)
+
+# On trace le graphique 
+ggplot(df_echantillon, aes(x = vehicle_price, y = down_payment_amount)) +
+  geom_point(aes(color = down_payment_amount >= vehicle_price), alpha = 0.5) +
+  geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed", linewidth = 1) +
+  scale_color_manual(values = c("FALSE" = "grey50", "TRUE" = "darkred"), 
+                     labels = c("Conforme (Échantillon 1%)", "Anomalie (100% affichées)")) +
+  labs(title = "Cohérence financière : Apport initial vs Prix du véhicule",
+       x = "Prix du véhicule", y = "Apport initial", color = "Statut") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
+
+Le Bar Chart empilé pour le Défaut vs Retard :
+
+
+```{r}
+ggplot(anomalies_defaut, aes(x = type_incoherence_defaut, fill = type_incoherence_defaut)) +
+  geom_bar(stat = "count", show.legend = FALSE) +
+  geom_text(stat = 'count', aes(label = ..count..), hjust = -0.2, size = 3.5) +
+  ylim(0, 900000) +
+  scale_fill_manual(values = c("Conforme" = "lightgreen", 
+                               "Sous-estimation : DPD >= 90 mais Flag = 0" = "orange", 
+                               "Sur-estimation : DPD < 90 mais Flag = 1" = "red")) +
+  labs(title = "Statut de défaut vs Jours de retard",
+       x = "", y = "Nombre de contrats") +
+  theme_minimal() +
+  coord_flip() # On retourne le graph en barre
+```
 
 
 
+```{r}
+ggplot(df, aes(x = origination_date)) +
+  geom_histogram(binwidth = 30, fill = "lightgreen", color = "black") +
+  geom_vline(xintercept = as.numeric(as.Date("2020-01-01")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2022-12-31")), color = "red", linetype = "dashed") +
+  labs(title = "Distribution des dates d'octroi (Origination Date)",
+       subtitle = "En rouge : Période réglementaire attendue (2020-2022)",
+       x = "Date d'octroi", y = "Nombre de contrats") +
+  theme_minimal()
+```
 
 
 
