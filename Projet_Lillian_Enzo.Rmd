@@ -100,6 +100,7 @@ str(df)
 ```
 
 
+I. Complétude :
 
 On va commencer par s'intéresser à la partie de la Complétude, où l'on va analyser les potentilles valeurs manquantes:
 
@@ -136,6 +137,8 @@ if(length(colonnes_vides) == 0) {
 
 
 Puisque nous n'avons aucun problème sur la complétude nous passons à la partie concernant l'unicité des données.
+
+II. Unicité :
 
 Ici il va être surtout important de regardé la colonne loan_id car c'est elle qui nous indique si on a des doublons dans nos valeurs saisies.
 
@@ -180,7 +183,7 @@ if (nb_lignes_dupliquees == 0) {
     arrange(loan_id)
 }
 ```
-
+III. Validité : 
 
 Cherchons si il y a des anomalies aux niveaux des Catégories annoncées :
 
@@ -250,6 +253,7 @@ print(paste0("Anomalies Durée du prêt : ", erreurs_duree, " soit ", round((err
 ```
 
 On a que toutes nos données sont bien dans les catégories où elles sont sensées être.
+
 
 Maintenant les anomalies aux niveaux des Catégories Numériques annoncées :
 
@@ -688,40 +692,7 @@ ggplot(df, aes(x = origination_date)) +
 ```{r}
 # Fonction proposée afin de résoudre les problèmes pour l'inspection.
 
-df1 <- df %>%
-  arrange(desc(origination_date)) %>%   
-  distinct(loan_id, .keep_all = TRUE) %>%
-  filter(
-    borrower_age >= 18,
-    vehicle_mileage_km > 0,
-    monthly_installment > 0
-  )
-
-df1
+df1 <- df
 ```
-
-
-
-```{r}
-
-```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
