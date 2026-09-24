@@ -6,59 +6,22 @@ output: pdf_document
 ---
 
 
+Installation et chargement des packages
 
-Contexte et objectif du projet :
-
-Vous êtes Data Analyst au sein de l’entité « CREDIT AUTO EUROPE » ; un organisme
-européen de financement automobile.
-En prélude d’une inspection du régulateur européen sur l’état de la qualité de vos bases de
-données de crédit, votre responsable vous soumet la base (credit_auto_retail_europe.csv;
-contenant 802 800 lignes et 25 colonnes).
-Avant l’arrivée de la mission d’inspection, la direction des risques vous demande de réaliser
-un audit de la qualité des données de cette base et d’en livrer un rapport formel.
-
-
-
-Les attentes :
-
-Votre responsable attend de vous un rapport d’audit qualité structuré autour des
-indicateurs de qualité suivants :
-
-• Complétude : présence ou non de valeurs manquantes.
-
-• Unicité : unicité des clés (pas de doublons).
-
-• Validité : les valeurs renseignées doivent être cohérentes.
-
-• Cohérence inter-champs : cohérence globale des informations sur l’ensemble de la
-base de données (deux ou plusieurs colonnes qui, mises en relation, se
-contredisent : les informations de disponibles pour un contrat ne doivent pas être
-contradictoires et/ou aberrantes).
-
-• Exactitude / plausibilité : valeurs renseignées doivent être sensées et cohérentes :
-au sens de l’arithmétique mais aussi de la logique du crédit automobile.
-
-• Fraîcheur / cohérence temporelle : les dates doivent être au bon format et
-cohérentes avec les périodes de collecte ainsi que l’ensemble de la chronologie des
-évènements renseignés.
-
-Votre rapport d’audit qualité (PDF) incluant pour chaque dimension : constats chiffrés,
-exemples de lignes problématiques et ampleur de l’incohérence.
-
-
-
-
-Pour chaque problème identifié, votre rapport doit indiquer :
-
-• La ou les colonne(s) concernée(s) et, si utile, la méthode utilisée pour le détecter.
-
-• Une estimation quantifiée de son ampleur (nombre ou % de lignes touchées).
-
-
-crtl + alt + i
 
 ```{r}
-# A réutiliser pour tout charger, installer d'abords le package pacman
+# install.packages(c(tidyverse, questionr, dplyr))
+```
+
+```{r}
+library(tidyverse)
+library(questionr)
+library(dplyr)
+```
+
+
+```{r}
+# pacman va regarder si on a déjà les packages et les charger si oui
 pacman::p_load(tidyverse, questionr, dplyr)
 ```
 
