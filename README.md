@@ -2,7 +2,6 @@
 
 ![R](https://img.shields.io/badge/R-276DC3?style=for-the-badge&logo=r&logoColor=white)
 ![RStudio](https://img.shields.io/badge/RStudio-75AADB?style=for-the-badge&logo=rstudio&logoColor=white)
-![R Markdown](https://img.shields.io/badge/R_Markdown-404040?style=for-the-badge&logo=markdown&logoColor=white)
 ![Tidyverse](https://img.shields.io/badge/Tidyverse-1A5276?style=for-the-badge&logo=r&logoColor=white)
 ![Finance](https://img.shields.io/badge/Risk_Management-Banking-darkgreen?style=for-the-badge)
 
@@ -73,8 +72,7 @@ The audit is structured around the 6 regulatory data quality dimensions:
 * **Core Packages:** `tidyverse` (`dplyr`, `ggplot2`, `readr`), `lubridate` (date parsing), `pacman` (package management), `knitr` (executive tables).
 
 ## 📂 Repository Structure
-* `Projet_Lillian_Enzo.Rmd`: The main automated R Markdown audit script containing all data wrangling, verification logic, and reporting code.
-* `Audit_Qualite_Donnees_CreditAuto.pdf`: The finalized formal executive audit report delivered to the Risk Directorate.
+* `Rapport_Projet_Lillian_Enzo.R`: The main automated R audit script containing all data wrangling, verification logic, and reporting code.
 * `dataset_credit_auto_retail_europe.csv`: The audit dataset (800k+ retail auto credit files).
 * `dictionnaire donnees_Projet_Etude_R.pdf`: The official regulatory data dictionary and business specifications.
 
@@ -83,4 +81,4 @@ The audit is structured around the 6 regulatory data quality dimensions:
    ```bash
    git clone [https://github.com/your-username/your-repo-name.git](https://github.com/your-username/your-repo-name.git)
 
-🌍 Note : The final PDF report Projet_Sans_Code.pdf is written in French. However, I would be more than happy to discuss the methodology, the code, or the results in English! Feel free to reach out.
+🌍 Note : The final PDF report TBH.pdf is written in French. However, I would be more than happy to discuss the methodology, the code, or the results in English! Feel free to reach out.
