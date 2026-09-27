@@ -73,8 +73,7 @@ The audit is structured around the 6 regulatory data quality dimensions:
 * **Core Packages:** `tidyverse` (`dplyr`, `ggplot2`, `readr`), `lubridate` (date parsing), `pacman` (package management), `knitr` (executive tables).
 
 ## 📂 Repository Structure
-* `Projet_Lillian_Enzo.Rmd`: The main automated R Markdown audit script containing all data wrangling, verification logic, and reporting code.
-* `Audit_Qualite_Donnees_CreditAuto.pdf`: The finalized formal executive audit report delivered to the Risk Directorate.
+* `Rapport_Projet_Lillian_Enzo.R`: The main automated R audit script containing all data wrangling, verification logic, and reporting code.
 * `dataset_credit_auto_retail_europe.csv`: The audit dataset (800k+ retail auto credit files).
 * `dictionnaire donnees_Projet_Etude_R.pdf`: The official regulatory data dictionary and business specifications.
 
