@@ -355,9 +355,6 @@ print(tab_chi2)
 print(round(100 * prop.table(tab_chi2, 1), 2))
 print(chisq.test(tab_chi2))
 
-cat("\nTaux de defaut - sans emploi :\n")
-print(ctrl %>% group_by(flag_SOLV_sans_emploi) %>%
-        summarise(nb = n(), taux_defaut_pct = round(100 * mean(default_flag), 2)))
 
 cat("\nTaux de defaut - endettement total > 60% :\n")
 print(ctrl %>% group_by(flag_SOLV_endettement_total_sup_60) %>%
@@ -408,20 +405,19 @@ print(t.test(ctrl$taux_total ~ ctrl$default_flag))
 theme_set(theme_minimal())
 expansion_haut <- expansion(mult = c(0, 0.15))   # marge pour les étiquettes de %/effectifs
 
-
 p_age <- ggplot(d, aes(x = borrower_age)) +
-  geom_histogram(binwidth = 1, fill = "skyblue", color = "white") +
+  geom_histogram(binwidth = 1, fill = "#b047c9", color = "#555555") +
   geom_vline(xintercept = c(18, 80), color = "red", linetype = "dashed") +
   labs(title = "Répartition de l'âge des emprunteurs", x = "Âge", y = "Effectif")
 
 
 p_revenu_brut <- ggplot(d, aes(x = "", y = monthly_net_income)) +
-  geom_boxplot(fill = "lightblue") +
+  geom_boxplot(fill = "#2f64b5", color = "#555555") +
   labs(title = "Revenu net mensuel (brut)", x = NULL, y = "EUR")
 
 
 p_revenu_zoom <- ggplot(d, aes(x = "", y = monthly_net_income)) +
-  geom_boxplot(fill = "lightblue") +
+  geom_boxplot(fill = "#2f64b5", color = "#555555") +
   coord_cartesian(ylim = c(0, 15000)) +
   labs(title = "Revenu net mensuel (zoom 0-15 000, domaine du dictionnaire)", x = NULL, y = "EUR")
 
@@ -430,23 +426,23 @@ p_top_anomalies <- synthese %>%
   filter(nb_lignes > 0) %>%
   slice_max(pct_base, n = 10, with_ties = FALSE) %>%
   ggplot(aes(x = reorder(controle, pct_base), y = pct_base)) +
-  geom_col(fill = "tomato") +
-  geom_text(aes(label = paste0(pct_base, "%")), hjust = -0.1, size = 3) +
+  geom_col(fill = "#b047c9", color = "#555555") +
+  geom_text(aes(label = paste0(pct_base, "%")), hjust = -0.1, size = 3, color = "#555555") +
   coord_flip() +
   scale_y_continuous(expand = expansion_haut) +
   labs(title = "Top 10 des contrôles les plus touchés", x = NULL, y = "% de la base")
 
 
 p_nb_anomalies <- ggplot(ctrl, aes(x = nb_anomalies)) +
-  geom_bar(fill = "tomato") +
+  geom_bar(fill = "#b047c9", color = "#555555") +
   labs(title = "Nombre d'anomalies par contrat", x = "Nombre d'anomalies", y = "Nombre de contrats")
 
 
 p_endettement_defaut <- ggplot(ctrl %>% filter(!is.na(taux_total)),
                                aes(x = factor(default_flag), y = taux_total)) +
-  geom_boxplot(fill = "lightgreen") +
+  geom_boxplot(fill = "#43d95c", color = "#555555") +
   coord_cartesian(ylim = c(0, 150)) +
-  geom_hline(yintercept = c(35, 60), color = c("orange", "red"), linetype = "dashed") +
+  geom_hline(yintercept = c(35, 60), color = "red", linetype = "dashed") +
   labs(title = "Taux d'endettement total selon le défaut",
        x = "default_flag (0 = sain, 1 = défaut)", y = "% du revenu")
 
@@ -458,7 +454,7 @@ p_apport_prix <- bind_rows(df_anomalies_apport, df_conformes_sample) %>%
              color = down_payment_amount >= vehicle_price)) +
   geom_point(alpha = 0.5) +
   geom_abline(slope = 1, intercept = 0, color = "red", linetype = "dashed") +
-  scale_color_manual(values = c("FALSE" = "grey50", "TRUE" = "darkred"),
+  scale_color_manual(values = c("FALSE" = "#555555", "TRUE" = "red"),
                      labels = c("Conforme (échantillon 1%)", "Anomalie (100% affichées)")) +
   labs(title = "Cohérence financière : apport initial vs prix du véhicule",
        x = "Prix du véhicule", y = "Apport initial", color = "Statut") +
@@ -466,15 +462,18 @@ p_apport_prix <- bind_rows(df_anomalies_apport, df_conformes_sample) %>%
 
 
 p_defaut_retard <- ggplot(ctrl, aes(x = type_incoherence_defaut, fill = type_incoherence_defaut)) +
-  geom_bar(show.legend = FALSE) +
-  geom_text(stat = "count", aes(label = after_stat(count)), hjust = -0.1, size = 3) +
+  geom_bar(color = "#555555", show.legend = FALSE) +
+  scale_fill_manual(values = c("Conforme" = "#43d95c", 
+                               "Sous-estimation (retard >= 90j, non marqué en défaut)" = "#b047c9", 
+                               "Sur-estimation (marqué en défaut, retard < 90j)" = "#2f64b5")) +
+  geom_text(stat = "count", aes(label = after_stat(count)), hjust = -0.1, size = 3, color = "#555555") +
   coord_flip() +
   scale_y_continuous(expand = expansion_haut) +
   labs(title = "Statut de défaut vs jours de retard", x = NULL, y = "Nombre de contrats")
 
 
 p_octrois <- ggplot(ctrl, aes(x = date_octroi)) +
-  geom_histogram(binwidth = 30, fill = "lightgreen", color = "black") +
+  geom_histogram(binwidth = 30, fill = "#43d95c", color = "#555555") +
   geom_vline(xintercept = as.numeric(c(debut_prod, fin_prod)), color = "red", linetype = "dashed") +
   labs(title = "Distribution des dates d'octroi",
        subtitle = "En rouge : période réglementaire attendue (2020-2022)",
@@ -485,7 +484,7 @@ p_defaut_statut <- d %>%
   group_by(employment_status) %>%
   summarise(taux_defaut_pct = round(100 * mean(default_flag), 2)) %>%
   ggplot(aes(x = reorder(employment_status, taux_defaut_pct), y = taux_defaut_pct)) +
-  geom_col(fill = "steelblue") +
+  geom_col(fill = "#2f64b5", color = "#555555") +
   coord_flip() +
   labs(title = "Taux de défaut par statut professionnel", x = NULL, y = "% de défaut")
 
