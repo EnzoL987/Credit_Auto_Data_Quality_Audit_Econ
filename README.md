@@ -18,23 +18,23 @@ The goal is to provide a rigorous and automated audit trail evaluating risk gove
 ```mermaid 
 graph TD
     %% Source
-    A[(Base Crédit Auto<br/>800k+ lignes)]:::blue --> B[Import et Typage des données]:::white
+    A[(Auto Credit Database <br/> 800,000+ records)]:::blue --> B[Data Import and Typing]:::white
 
     %% Audit des 6 dimensions
-    B --> C[Audit Qualité des Données]:::light
+    B --> C[Data Quality Audit]:::light
     
-    C --> D[1. Complétude et Unicité]:::purple
-    C --> E[2. Validité des domaines]:::purple
-    C --> F[3. Cohérences inter-champs & Métier]:::purple
-    C --> G[4. Cohérence temporelle]:::purple
+    C --> D[Completeness and Uniqueness]:::purple
+    C --> E[Validity of Domains]:::purple
+    C --> F[Cross-Functional & Business Alignment]:::purple
+    C --> G[Temporal Consistency]:::purple
 
     %% Rapport
-    D --> H[Rapport d'audit<br/>Régulateur]:::white
+    D --> H[Audit Report<br/>Regulator]:::white
     E --> H
     F --> H
     G --> H
 
-    %% Livrable final / Recommandations
+    %% Final Deliverable / Recommendations
     H --> I((Propositions de<br/>changements)):::green
 
     %% Styles
@@ -76,7 +76,7 @@ The audit is structured around the 6 regulatory data quality dimensions:
 * `Projet_Lillian_Enzo.Rmd`: The main automated R Markdown audit script containing all data wrangling, verification logic, and reporting code.
 * `Audit_Qualite_Donnees_CreditAuto.pdf`: The finalized formal executive audit report delivered to the Risk Directorate.
 * `dataset_credit_auto_retail_europe.csv`: The audit dataset (800k+ retail auto credit files).
-* `dictionnaire_donnees.pdf`: The official regulatory data dictionary and business specifications.
+* `dictionnaire donnees_Projet_Etude_R.pdf`: The official regulatory data dictionary and business specifications.
 
 ## 🚀 How to Reproduce the Analysis?
 1. Clone this repository:
