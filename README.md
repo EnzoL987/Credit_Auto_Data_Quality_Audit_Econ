@@ -2,7 +2,6 @@
 
 ![R](https://img.shields.io/badge/R-276DC3?style=for-the-badge&logo=r&logoColor=white)
 ![RStudio](https://img.shields.io/badge/RStudio-75AADB?style=for-the-badge&logo=rstudio&logoColor=white)
-![R Markdown](https://img.shields.io/badge/R_Markdown-404040?style=for-the-badge&logo=markdown&logoColor=white)
 ![Tidyverse](https://img.shields.io/badge/Tidyverse-1A5276?style=for-the-badge&logo=r&logoColor=white)
 ![Finance](https://img.shields.io/badge/Risk_Management-Banking-darkgreen?style=for-the-badge)
 
