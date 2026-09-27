@@ -259,7 +259,9 @@ synthese <- data.frame(
 
 cat("\n SYNTHESE DES CONTROLES \n")
 print(synthese, row.names = FALSE)
-write.csv(synthese, file.path(dossier_sortie, "synthese_anomalies.csv"), row.names = FALSE)
+
+# Sortie d'un excel avec le tableau des anomalies :
+# write.csv(synthese, "synthese_anomalies.csv", row.names = FALSE)
 
 
 # Une table par dimension 
@@ -548,7 +550,7 @@ for (prefixe in c("^flag_COM|^flag_UNI", "^flag_VAL", "^flag_COH", "^flag_PLA|^f
 cat("Base brute inchangee :", identical(dim(d), dim_originale), "\n")
 
 
-# Si vous voulez sortir directement un excel avec les présences d'anomalies :
-# cat("CSV :", file.path(dossier_sortie, "synthese_anomalies.csv"), "\n")
+
+
 
 
