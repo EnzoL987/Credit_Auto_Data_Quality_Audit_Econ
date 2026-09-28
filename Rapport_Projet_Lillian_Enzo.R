@@ -76,7 +76,7 @@ print(sapply(d, function(x) sum(x == "" | x == " ", na.rm = TRUE)))
 
 
 # Doublons sur la cle loan_id : duplicated() seul ne marque pas la première occurrence de chaque doublon.
-# Combiné avec fromLast = TRUE pour que le flag et le % de lignes touchees portent sur la totalite des lignes concernees.
+# Combiné avec fromLast = TRUE pour que le flag et le % de lignes touchées portent sur la totalité des lignes concernées.
 ids_dupliques <- unique(d$loan_id[duplicated(d$loan_id) | duplicated(d$loan_id, fromLast = TRUE)])
 lignes_id_dupliquees <- d$loan_id %in% ids_dupliques
 
@@ -84,10 +84,9 @@ lignes_id_dupliquees <- d$loan_id %in% ids_dupliques
 dup_ligne <- duplicated(d) | duplicated(d, fromLast = TRUE)
 
 cat("\n UNICITE \n")
-cat("Identifiants loan_id concernes par un doublon :", length(ids_dupliques), "\n")
-cat("Lignes concernees (toutes occurrences) :", sum(lignes_id_dupliquees), "\n")
+
+cat("Lignes concernées (toutes occurrences) :", sum(lignes_id_dupliquees), "\n")
 cat("Lignes strictement identiques (toutes colonnes) :", sum(dup_ligne), "\n")
-cat("Conflits sur la cle (meme id, contenu different) :", sum(lignes_id_dupliquees & !dup_ligne), "\n")
 cat("Identifiants au mauvais format (AUTO + 7 chiffres) :", sum(!grepl("^AUTO[0-9]{7}$", d$loan_id)), "\n")
 
 
@@ -363,12 +362,13 @@ cat("\nTaux de defaut - endettement total > 60% :\n")
 print(ctrl %>% group_by(flag_SOLV_endettement_total_sup_60) %>%
         summarise(nb = n(), taux_defaut_pct = round(100 * mean(default_flag), 2)))
 
+
 # Sensibilite des indicateurs (moyenne, mediane) aux valeurs hors domaine, calculee SANS modifier `d`
 cat("\nIndicateurs bruts (toutes lignes) :\n")
 print(d %>% summarise(
   moy_revenu = mean(monthly_net_income), med_revenu = median(monthly_net_income),
-  moy_prix   = mean(vehicle_price), med_prix = median(vehicle_price),
-  moy_age    = mean(borrower_age), med_age = median(borrower_age)
+  moy_prix = mean(vehicle_price), med_prix = median(vehicle_price),
+  moy_age = mean(borrower_age), med_age = median(borrower_age)
 ))
 
 cat("\nIndicateurs apres exclusion des valeurs hors domaine :\n")
