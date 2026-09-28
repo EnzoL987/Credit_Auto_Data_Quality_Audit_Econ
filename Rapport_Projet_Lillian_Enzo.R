@@ -36,7 +36,6 @@ marques_utilitaires <- c("Volkswagen Utilitaires", "Opel Professional",
                          "Peugeot Pro", "Fiat Professional", "Iveco", "Renault Pro+")
 
 
-
 ## 1. IMPORT ET APERCU DE LA BASE :
 
 
@@ -263,7 +262,7 @@ cat("\n SYNTHESE DES CONTROLES \n")
 print(synthese, row.names = FALSE)
 
 # Sortie d'un excel avec le tableau des anomalies :
-# write.csv(synthese, "synthese_anomalies.csv", row.names = FALSE)
+write.csv(synthese, "synthese_anomalies.csv", row.names = FALSE)
 
 
 # Une table par dimension 
