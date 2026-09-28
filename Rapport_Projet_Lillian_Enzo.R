@@ -7,7 +7,6 @@
 
 library(tidyverse)
 library(knitr)
-library(kableExtra)
 
 options(scipen = 999)   # Permet d'éviter l'ecriture scientifique (1e+05) dans les sorties
 
@@ -50,7 +49,7 @@ cat("APERCU DE LA BASE\n")
 cat("Lignes :", nrow(d), "| Colonnes :", ncol(d), "\n\n")
 
 # Apercu des variables 
-print(str(d))
+str(d)
 
 # Apercu statistique des variables
 print(summary(d))
@@ -162,6 +161,8 @@ ctrl <- d %>%
     flag_VAL_ltv_hors_0_1 = ltv_ratio < 0 | ltv_ratio > 1,
     flag_VAL_default_flag_hors_0_1 = !default_flag %in% c(0, 1),
     flag_VAL_mensualite_negative = monthly_installment <= 0,
+    flag_VAL_apport_negatif = down_payment_amount < 0,
+    flag_VAL_montant_pret_nul_ou_negatif = loan_amount <= 0,
     flag_VAL_km_negatif = vehicle_mileage_km < 0,
     flag_VAL_dpd_negatif = days_past_due < 0,
     flag_VAL_dpd_9999 = days_past_due == 9999,   # valeur "code", pas un vrai retard
@@ -206,6 +207,7 @@ ctrl <- d %>%
     ## V. EXACTITUDE / PLAUSIBILITE :
     
     flag_PLA_revenu_aberrant = monthly_net_income <= 0 | monthly_net_income > 50000,
+    flag_PLA_sans_emploi_revenu_sup_5000 = employment_status == "Sans emploi" & monthly_net_income > 5000,
     flag_PLA_prix_extreme_sup_300000 = vehicle_price > 300000,
     flag_PLA_pret_sup_140000 = loan_amount > 140000,   
     flag_PLA_occasion_km_par_an_sup_30000 = vehicle_condition == "Occasion" & vehicle_age_years > 0 & km_par_an > 30000,
@@ -256,6 +258,7 @@ synthese <- data.frame(
   pct_base  = round(100 * nb_par_controle / nrow(d), 2)
 ) %>% arrange(controle)
 
+rownames(synthese) <- NULL   # évite la colonne dupliquée dans les tableaux kable
 
 cat("\n SYNTHESE DES CONTROLES \n")
 print(synthese, row.names = FALSE)
@@ -326,7 +329,7 @@ print(table(format(ctrl$date_octroi, "%Y")))
 # solvabilité (SOLV), qui relève du risque du dossier et non d'une erreur de saisie
 flags_donnees <- ctrl %>%
   select(starts_with("flag_")) %>%
-  select(-starts_with("flag_SOLV"))
+  select(-starts_with("flag_SOLV"), -flag_VAL_revenu_hors_dico_mais_plausible)
 
 
 ctrl$nb_anomalies <- rowSums(flags_donnees, na.rm = TRUE)
