@@ -3,7 +3,6 @@
 
 # install.packages("tidyverse")
 # install.packages("knitr")
-# install.packages("kableExtra")
 
 library(tidyverse)
 library(knitr)
@@ -394,11 +393,13 @@ print(round(tapply(d$default_flag, d$employment_status, mean), 4))
 # Le taux d'endettement total differe-t-il selon le defaut ?
 set.seed(123)
 echantillon <- ctrl %>% filter(!is.na(taux_total)) %>% slice_sample(n = 5000)
+
 cat("\nTest de normalite (Shapiro, echantillon n=5000) :\n")
 print(shapiro.test(echantillon$taux_total))
 
-cat("\nDistribution non normale -> test non parametrique + test t pour comparaison :\n")
+cat("\nDistribution non normale -> test non parametrique (Wilcoxon) + test t pour comparaison :\n")
 print(wilcox.test(ctrl$taux_total ~ ctrl$default_flag))
+
 print(t.test(ctrl$taux_total ~ ctrl$default_flag))
 
 
