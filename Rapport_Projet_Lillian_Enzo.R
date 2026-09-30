@@ -263,12 +263,17 @@ print(synthese, row.names = FALSE)
 # Sortie d'un excel avec le tableau des anomalies :
 # write.csv(synthese, "synthese_anomalies.csv", row.names = FALSE)
 
+# Création d'un beau tableau global avec kable (l'équivalent du tableau .csv mais ici) :
 
-# Une table par dimension 
-for (prefixe in c("^flag_COM|^flag_UNI", "^flag_VAL", "^flag_COH", "^flag_PLA|^flag_SOLV", "^flag_TMP")) {
-  cat("\n---", prefixe, "---\n")
-  print(filter(synthese, grepl(prefixe, controle)), row.names = FALSE)
-}
+tableau_synthese <- synthese %>%
+  kable(
+    format = "markdown",
+    col.names = c("Nom du Contrôle", "Nombre de Lignes", "Pourcentage de la Base (%)"),
+    caption = "Synthèse globale des anomalies identifiées",
+    align = c("l", "c", "c") # Alignement 
+  ) 
+
+print(tableau_synthese)
 
 
 ## 5. EXEMPLES DE LIGNES PROBLEMATIQUES (5 par constat) :
@@ -497,17 +502,7 @@ print(p_defaut_statut) # Le statut sans emploi va être le plus propice aux erre
 
 
 
-# Création d'un beau tableau global avec kable (l'équivalent du tableau .csv qu'on fait sortir) :
 
-tableau_synthese <- synthese %>%
-  kable(
-    format = "markdown",
-    col.names = c("Nom du Contrôle", "Nombre de Lignes", "Pourcentage de la Base (%)"),
-    caption = "Synthèse globale des anomalies identifiées",
-    align = c("l", "c", "c") # Alignement 
-  ) 
-
-print(tableau_synthese)
 
 
 
