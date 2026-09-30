@@ -216,7 +216,6 @@ ctrl <- d %>%
     
     
     flag_SOLV_mensualite_sup_revenu = monthly_installment > monthly_net_income,
-    flag_SOLV_endettement_total_sup_35 = !is.na(taux_total) & taux_total > 35,
     flag_SOLV_endettement_total_sup_60 = !is.na(taux_total) & taux_total > 60,
     flag_SOLV_charges_sup_100_du_revenu = !is.na(taux_total) & taux_total >= 100,
     flag_SOLV_prix_sup_3_ans_de_revenu = vehicle_price > 36 * monthly_net_income,
@@ -410,18 +409,18 @@ theme_set(theme_minimal())
 expansion_haut <- expansion(mult = c(0, 0.15))   # marge pour les étiquettes de %/effectifs
 
 p_age <- ggplot(d, aes(x = borrower_age)) +
-  geom_histogram(binwidth = 1, fill = "#b047c9", color = "#555555") +
+  geom_histogram(binwidth = 1, fill = "#cdb8f2", color = "black") +
   geom_vline(xintercept = c(18, 80), color = "red", linetype = "dashed") +
   labs(title = "Répartition de l'âge des emprunteurs", x = "Âge", y = "Effectif")
 
 
 p_revenu_brut <- ggplot(d, aes(x = "", y = monthly_net_income)) +
-  geom_boxplot(fill = "#2f64b5", color = "#555555") +
+  geom_boxplot(fill = "#2f64b5", color = "black") +
   labs(title = "Revenu net mensuel (brut)", x = NULL, y = "EUR")
 
 
 p_revenu_zoom <- ggplot(d, aes(x = "", y = monthly_net_income)) +
-  geom_boxplot(fill = "#2f64b5", color = "#555555") +
+  geom_boxplot(fill = "#2f64b5", color = "black") +
   coord_cartesian(ylim = c(0, 15000)) +
   labs(title = "Revenu net mensuel (zoom 0-15 000, domaine du dictionnaire)", x = NULL, y = "EUR")
 
@@ -430,25 +429,16 @@ p_top_anomalies <- synthese %>%
   filter(nb_lignes > 0) %>%
   slice_max(pct_base, n = 10, with_ties = FALSE) %>%
   ggplot(aes(x = reorder(controle, pct_base), y = pct_base)) +
-  geom_col(fill = "#b047c9", color = "#555555") +
-  geom_text(aes(label = paste0(pct_base, "%")), hjust = -0.1, size = 3, color = "#555555") +
+  geom_col(fill = "#cdb8f2", color = "black") +
+  geom_text(aes(label = paste0(pct_base, "%")), hjust = -0.1, size = 3, color = "black") +
   coord_flip() +
   scale_y_continuous(expand = expansion_haut) +
   labs(title = "Top 10 des contrôles les plus touchés", x = NULL, y = "% de la base")
 
 
 p_nb_anomalies <- ggplot(ctrl, aes(x = nb_anomalies)) +
-  geom_bar(fill = "#b047c9", color = "#555555") +
+  geom_bar(fill = "#cdb8f2", color = "black") +
   labs(title = "Nombre d'anomalies par contrat", x = "Nombre d'anomalies", y = "Nombre de contrats")
-
-
-p_endettement_defaut <- ggplot(ctrl %>% filter(!is.na(taux_total)),
-                               aes(x = factor(default_flag), y = taux_total)) +
-  geom_boxplot(fill = "#43d95c", color = "#555555") +
-  coord_cartesian(ylim = c(0, 150)) +
-  geom_hline(yintercept = c(35, 60), color = "red", linetype = "dashed") +
-  labs(title = "Taux d'endettement total selon le défaut",
-       x = "default_flag (0 = sain, 1 = défaut)", y = "% du revenu")
 
 
 df_anomalies_apport <- d %>% filter(down_payment_amount >= vehicle_price)
@@ -458,7 +448,7 @@ p_apport_prix <- bind_rows(df_anomalies_apport, df_conformes_sample) %>%
              color = down_payment_amount >= vehicle_price)) +
   geom_point(alpha = 0.5) +
   geom_abline(slope = 1, intercept = 0, color = "red", linetype = "dashed") +
-  scale_color_manual(values = c("FALSE" = "#555555", "TRUE" = "red"),
+  scale_color_manual(values = c("FALSE" = "black", "TRUE" = "red"),
                      labels = c("Conforme (échantillon 1%)", "Anomalie (100% affichées)")) +
   labs(title = "Cohérence financière : apport initial vs prix du véhicule",
        x = "Prix du véhicule", y = "Apport initial", color = "Statut") +
@@ -466,18 +456,18 @@ p_apport_prix <- bind_rows(df_anomalies_apport, df_conformes_sample) %>%
 
 
 p_defaut_retard <- ggplot(ctrl, aes(x = type_incoherence_defaut, fill = type_incoherence_defaut)) +
-  geom_bar(color = "#555555", show.legend = FALSE) +
+  geom_bar(color = "black", show.legend = FALSE) +
   scale_fill_manual(values = c("Conforme" = "#43d95c", 
-                               "Sous-estimation (retard >= 90j, non marqué en défaut)" = "#b047c9", 
+                               "Sous-estimation (retard >= 90j, non marqué en défaut)" = "#cdb8f2", 
                                "Sur-estimation (marqué en défaut, retard < 90j)" = "#2f64b5")) +
-  geom_text(stat = "count", aes(label = after_stat(count)), hjust = -0.1, size = 3, color = "#555555") +
+  geom_text(stat = "count", aes(label = after_stat(count)), hjust = -0.1, size = 3, color = "black") +
   coord_flip() +
   scale_y_continuous(expand = expansion_haut) +
   labs(title = "Statut de défaut vs jours de retard", x = NULL, y = "Nombre de contrats")
 
 
 p_octrois <- ggplot(ctrl, aes(x = date_octroi)) +
-  geom_histogram(binwidth = 30, fill = "#43d95c", color = "#555555") +
+  geom_histogram(binwidth = 30, fill = "#43d95c", color = "black") +
   geom_vline(xintercept = as.numeric(c(debut_prod, fin_prod)), color = "red", linetype = "dashed") +
   labs(title = "Distribution des dates d'octroi",
        subtitle = "En rouge : période réglementaire attendue (2020-2022)",
@@ -488,7 +478,7 @@ p_defaut_statut <- d %>%
   group_by(employment_status) %>%
   summarise(taux_defaut_pct = round(100 * mean(default_flag), 2)) %>%
   ggplot(aes(x = reorder(employment_status, taux_defaut_pct), y = taux_defaut_pct)) +
-  geom_col(fill = "#2f64b5", color = "#555555") +
+  geom_col(fill = "#2f64b5", color = "black") +
   coord_flip() +
   labs(title = "Taux de défaut par statut professionnel", x = NULL, y = "% de défaut")
 
@@ -496,64 +486,32 @@ p_defaut_statut <- d %>%
 # Sorties des graphiques :
 
 print(p_age)
-print(p_revenu_brut)
-print(p_revenu_zoom)
+print(p_revenu_brut) # Pour bien voir les outliers
+print(p_revenu_zoom) # Comprendre à quoi ressemble nos vraies nos vraies données
 print(p_top_anomalies)
-print(p_nb_anomalies)
-print(p_endettement_defaut)
-print(p_apport_prix)
+print(p_nb_anomalies) # On voit bien que généralement on en a pas mais que il peut y en avoir entre 1 et 10 par contrat
+print(p_apport_prix) # Différence entre apport et le prix du véhicule
 print(p_defaut_retard)
-print(p_octrois)
-print(p_defaut_statut)
+print(p_octrois) # On s'arrure que les dates vont être là où l'on veut
+print(p_defaut_statut) # Le statut sans emploi va être le plus propice aux erreurs car c'est celui qui va jouer sur les variables d'argent
 
 
 
-# Création d'un beau tableau global avec kable :
+# Création d'un beau tableau global avec kable (l'équivalent du tableau .csv qu'on fait sortir) :
 
 tableau_synthese <- synthese %>%
   kable(
-    format = "markdown", # ou "latex" ou "html" selon ton format de sortie final R Markdown
+    format = "markdown",
     col.names = c("Nom du Contrôle", "Nombre de Lignes", "Pourcentage de la Base (%)"),
     caption = "Synthèse globale des anomalies identifiées",
-    align = c("l", "c", "c") # Alignement : gauche, centré, centré
+    align = c("l", "c", "c") # Alignement 
   ) 
 
 print(tableau_synthese)
 
-cat("\n\n")
-
-# Une table par dimension, formatée avec kable
-for (prefixe in c("^flag_COM|^flag_UNI", "^flag_VAL", "^flag_COH", "^flag_PLA|^flag_SOLV", "^flag_TMP")) {
-  
-  # On donne un nom plus lisible au préfixe pour le titre du tableau
-  nom_dimension <- case_when(
-    prefixe == "^flag_COM|^flag_UNI" ~ "Complétude et Unicité",
-    prefixe == "^flag_VAL" ~ "Validité",
-    prefixe == "^flag_COH" ~ "Cohérence Inter-champs",
-    prefixe == "^flag_PLA|^flag_SOLV" ~ "Plausibilité et Solvabilité",
-    prefixe == "^flag_TMP" ~ "Cohérence Temporelle"
-  )
-  
-  # Filtrage des données
-  donnees_filtrees <- filter(synthese, grepl(prefixe, controle))
-  
-  # Génération du tableau kable
-  tableau_dimension <- donnees_filtrees %>%
-    kable(
-      format = "markdown", 
-      col.names = c("Contrôle", "Nb Lignes", "% Base"),
-      caption = paste("Anomalies :", nom_dimension),
-      align = c("l", "c", "c")
-    )
-  
-  print(tableau_dimension)
-}
 
 
 cat("Base brute inchangee :", identical(dim(d), dim_originale), "\n")
-
-
-
 
 
 
