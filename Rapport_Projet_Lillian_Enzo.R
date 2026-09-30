@@ -90,6 +90,98 @@ cat("Identifiants au mauvais format (AUTO + 7 chiffres) :", sum(!grepl("^AUTO[0-
 
 
 
+
+
+## 2bis. VALEURS SENTINELLES (valeurs "codes" qui masquent une valeur manquante)
+
+cols_num <- names(d)[sapply(d, is.numeric)]
+
+# Domaines du dictionnaire (NA = pas de borne documentée)
+domaines <- tribble(
+  ~colonne,               ~min,  ~max,
+  "borrower_age",           18,     80,
+  "job_seniority_years",     0,     45,
+  "monthly_net_income",    750,  15000,
+  "existing_debt_ratio",     0,     60,
+  "credit_bureau_score",   300,    850,
+  "nb_previous_loans",       0,      6,
+  "vehicle_price",        4000, 140000,
+  "vehicle_age_years",       0,     12,
+  "interest_rate_pct",     1.5,     15,
+  "ltv_ratio",               0,      1,
+  "down_payment_amount",     0,     NA,
+  "loan_amount",             0,     NA,
+  "monthly_installment",     0,     NA,
+  "vehicle_mileage_km",      0,     NA,
+  "days_past_due",           0,     NA,
+  "loan_term_months", 0, NA,
+  "default_flag", 0, 1
+)
+
+# 1a. Les 3 valeurs les plus fréquentes de chaque colonne numérique, avec leur statut vs domaine
+top_valeurs <- map_dfr(cols_num, function(col) {
+  d %>%
+    count(valeur = .data[[col]], name = "nb_lignes", sort = TRUE) %>%
+    slice_head(n = 3) %>%
+    mutate(colonne = col, pct_base = round(100 * nb_lignes / nrow(d), 3))
+}) %>%
+  left_join(domaines, by = "colonne") %>%
+  mutate(hors_domaine = valeur < min | (!is.na(max) & valeur > max))
+
+# Affichage complet de toutes les lignes sans conflit d'argument :
+print(as_tibble(top_valeurs), n = Inf)
+
+
+# 1b. Codes classiques (0 exclu : valeur légitime dans plusieurs colonnes)
+codes_classiques <- c(9999)
+scan_codes <- map_dfr(cols_num, function(col) {
+  d %>%
+    filter(.data[[col]] %in% codes_classiques) %>%
+    count(valeur = .data[[col]], name = "nb_lignes") %>%
+    mutate(colonne = col, pct_base = round(100 * nb_lignes / nrow(d), 3))
+})
+
+# Conversion en tibble pour que "n = Inf" soit bien interprété :
+print(as_tibble(scan_codes), n = Inf)
+
+
+# 1c. Colonnes texte : modalités "vides" déguisées, et liste complète des modalités
+mots_vides <- c("", "NA", "N/A", "NULL", "?", "-", "INCONNU", "UNKNOWN", "XXX")
+cols_txt <- setdiff(names(d)[sapply(d, is.character)],
+                    c("loan_id", "origination_date", "employment_start_date"))
+
+scan_txt <- map_dfr(cols_txt, function(col) {
+  d %>%
+    filter(toupper(trimws(.data[[col]])) %in% mots_vides) %>%
+    count(valeur = .data[[col]], name = "nb_lignes") %>%
+    mutate(colonne = col)
+})
+
+# Réinitialisation de sécurité de l'option globale
+options(na.print = NULL)
+
+print(as_tibble(scan_txt))
+print(lapply(d[cols_txt], table))
+
+# On a aucune erreur ici
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## 3. CONSTRUCTION DES CONTROLES (les "flags") :
 
 
