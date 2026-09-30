@@ -90,7 +90,22 @@ scan_sentinelle <- map_dfr(cols_num, function(col) {
 # Affichage des sentinelles numériques :
 print(as_tibble(scan_sentinelle), n = Inf)
 
-# On a ici que plusieurs variables ont des valeurs sentilles ce qui confirme notre théorie
+cat("\n PREUVE MATHÉMATIQUE DU CODE SENTINELLE 9999 (Analyse des pics) \n")
+
+# On compare l'occurrence de 9999 par rapport à la moyenne de ses 20 voisins directs
+# -> On cherche à savoir si c'est un vrai 9999 ou une valeur qu'on a mit car NA
+pic_sentinelle <- map_dfr(unique(scan_sentinelle$colonne), function(col) {
+  tibble(
+    colonne = col,
+    nb_9999 = sum(d[[col]] == 9999, na.rm = TRUE),
+    moyenne_voisins = sum(d[[col]] %in% c(9989:9998, 10000:10009), na.rm = TRUE) / 20
+  )
+})
+
+print(pic_sentinelle)
+# Si nb_9999 est anormalement supérieur à moyenne_voisins, cela confirme qu'il 
+# s'agit d'une valeur manquante déguisée (faux NA) et non d'une saisie naturelle.
+# Ici on va donc probablement avoir que days_pas_due avec ces faux NA .
 
 
 # 2. Colonnes texte : modalités "vides" déguisées, et liste complète des modalités
@@ -143,7 +158,7 @@ cat("Identifiants au mauvais format (AUTO + 7 chiffres) :", sum(!grepl("^AUTO[0-
 ## IV. CONSTRUCTION DES CONTROLES (les "flags") :
 
 
-# Un peu de vocabullaire sur ce qu'on s'apprête à faire :
+# Un peu de vocabulaire sur ce qu'on s'apprête à faire :
 
 # ctrl = copie de d avec des colonnes de controle en plus
 # flag = TRUE quand la ligne pose probleme pour le controle concerne
@@ -173,8 +188,8 @@ ctrl <- d %>%
     
     ## 1. COMPLETUDE :
     
-    
     flag_COM_valeur_manquante = rowSums(is.na(d)) > 0,
+    flag_COM_valeur_sentinelle_9999 = days_past_due == 9999, # Faux NA identifiés dans la première partie
     
     
     ## 2. UNICITE :
@@ -214,9 +229,6 @@ ctrl <- d %>%
     flag_VAL_montant_pret_nul_ou_negatif = loan_amount <= 0,
     flag_VAL_km_negatif = vehicle_mileage_km < 0,
     flag_VAL_dpd_negatif = days_past_due < 0,
-    flag_VAL_dpd_9999 = days_past_due == 9999,   # valeur "code", pas un vrai retard
-    # rend visible les lignes que la formule d'amortissement ne peut pas evaluer
-    # (taux <= 0), au lieu de les faire disparaitre silencieusement du controle COH suivant
     flag_VAL_mensualite_theo_incalculable = is.na(mensualite_theo),
     
     
@@ -281,8 +293,8 @@ ctrl <- d %>%
     flag_TMP_debut_emploi_apres_arrete = date_debut_emploi > date_obs,
     flag_TMP_anciennete_vs_dates = abs(anciennete_dates - job_seniority_years) > 1,
     flag_TMP_debut_emploi_avant_15_ans = (borrower_age - anciennete_dates) < 15,
-    flag_TMP_dpd_sup_jours_ecoules = days_past_due > as.numeric(date_obs - date_octroi),
-    flag_TMP_dpd_sup_730 = days_past_due > 730   # fenêtre de performance = 24 mois
+    flag_TMP_dpd_sup_jours_ecoules = days_past_due != 9999 & days_past_due > as.numeric(date_obs - date_octroi),
+    flag_TMP_dpd_sup_730 = days_past_due != 9999 & days_past_due > 730   # fenêtre de performance = 24 mois
   )
 
 
@@ -439,19 +451,26 @@ print(ctrl %>%
         group_by(flag_SOLV_endettement_total_sup_60) %>%
         summarise(nb = n(), taux_defaut_pct = round(100 * mean(default_flag), 2)))
 
-cat("\n Test du Khi2 (Significativité de l'écart de défaut selon l'endettement) :\n")
+# Calcul du Khi2 et de la taille d'effet
+cat("\n Test du Khi2 et Taille d'effet :\n")
+
 tab_chi2 <- table(ctrl$flag_SOLV_endettement_total_sup_60, ctrl$default_flag)
-print(chisq.test(tab_chi2))
+test_khi2 <- chisq.test(tab_chi2, correct = FALSE)
 
+print(test_khi2)
 
-# 2. Comparaison des moyennes/médianes du taux d'effort total (Sains vs Défauts)
-cat("\n Test de Wilcoxon (Non-paramétrique : Ecart du taux d'effort selon statut) :\n")
+phi <- sqrt(unname(test_khi2$statistic) / sum(tab_chi2))
 
-# On utilise Wilcoxon car le taux d'endettement ne suit pas une loi normale parfaite
-print(wilcox.test(taux_total ~ default_flag, data = ctrl))
+cat("Taille d'effet (Coefficient Phi) :", round(phi, 3), "\n")
 
-cat("\nTest-t (Comparaison des moyennes globales du taux d'effort) :\n")
-print(t.test(taux_total ~ default_flag, data = ctrl))
+# Tests de Wilcoxon et t-test sur la base nettoyé des valeurs aberrantes
+ctrl_propre <- ctrl %>% filter(!au_moins_une)
+
+cat("\n Test de Wilcoxon (Sur données nettoyées) :\n")
+print(wilcox.test(taux_total ~ default_flag, data = ctrl_propre))
+
+cat("\n Test-t (Sur données nettoyées) :\n")
+print(t.test(taux_total ~ default_flag, data = ctrl_propre))
 
 
 
@@ -468,100 +487,103 @@ theme_set(
     )
 )
 
-expansion_haut <- expansion(mult = c(0, 0.15))   # marge pour les étiquettes de %/effectifs
+
+# Définit une marge supérieure dynamique de 15% pour aérer les étiquettes de texte dans les barplots
+expansion_haut <- expansion(mult = c(0, 0.15))   
+
 
 p_age <- ggplot(d, aes(x = borrower_age)) +
   geom_histogram(binwidth = 1, fill = "#cdb8f2", color = "black") +
-  geom_vline(xintercept = c(18, 80), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = c(18, 80), color = "red", linetype = "dashed") + 
+  # Trace deux barrières verticales rouges pour montrer les limites d'âge (18 et 80)
   labs(title = "Répartition de l'âge des emprunteurs", x = "Âge", y = "Effectif")
 
-
+# Boîte à moustaches globale pour observer l'écrasement visuel dû aux valeurs extrêmes
 p_revenu_brut <- ggplot(d, aes(x = "", y = monthly_net_income)) +
   geom_boxplot(fill = "#2f64b5", color = "black") +
   labs(title = "Revenu net mensuel (brut)", x = NULL, y = "EUR")
 
-
+# On fait ici le zoom sur le boxplot
 p_revenu_zoom <- ggplot(d, aes(x = "", y = monthly_net_income)) +
   geom_boxplot(fill = "#2f64b5", color = "black") +
-  coord_cartesian(ylim = c(0, 15000)) +
+  coord_cartesian(ylim = c(0, 15000)) + # On fixe les limites de l'axe Y
   labs(title = "Revenu net mensuel (zoom 0-15 000, domaine du dictionnaire)", x = NULL, y = "EUR")
 
 
+# Graph utilisé avec la majorité des détails qu'on utilise sur les autres graphs :
+
 p_top_anomalies <- synthese %>%
-  filter(nb_lignes > 0) %>%
-  slice_max(pct_base, n = 10, with_ties = FALSE) %>%
-  ggplot(aes(x = reorder(controle, pct_base), y = pct_base)) +
-  geom_col(fill = "#cdb8f2", color = "black") +
-  geom_text(aes(label = paste0(pct_base, "%")), hjust = -0.1, size = 3, color = "black") +
-  coord_flip() +
-  scale_y_continuous(expand = expansion_haut) +
-  labs(title = "Top 10 des contrôles les plus touchés", x = NULL, y = "% de la base")
+  filter(nb_lignes > 0) %>% # Conserve uniquement les contrôles ayant détecté au moins une erreur
+  filter(!str_detect(controle, "SOLV")) %>% # Exclut les règles de solvabilité pour se concentrer sur la pure qualité des données
+  slice_max(pct_base, n = 10, with_ties = FALSE) %>% # Top 10
+  ggplot(aes(x = reorder(controle, pct_base), y = pct_base)) + # Définit les axes et arrange par fréquence
+  geom_col(fill = "#cdb8f2", color = "black") + 
+  geom_text(aes(label = paste0(pct_base, "%")), hjust = -0.1, size = 3, color = "black") + 
+  # Ajoute la valeur chiffrée avec le symbole % décalée juste au bout de chaque barre
+  coord_flip() + # Bascule les axes X et Y pour rendre les libellés longs parfaitement lisibles
+  scale_y_continuous(expand = expansion_haut) + # Ajoute une marge à droite
+  labs(title = "Top 10 des contrôles les plus touchés", x = NULL, y = "% de la base") # Labelisation
 
 
+# Diagramme à barres simple sur le nombre d'erreur
 p_nb_anomalies <- ggplot(ctrl, aes(x = nb_anomalies)) +
-  geom_bar(fill = "#cdb8f2", color = "black") +
+  geom_bar(fill = "#cdb8f2", color = "black") + 
   labs(title = "Nombre d'anomalies par contrat", x = "Nombre d'anomalies", y = "Nombre de contrats")
 
 
-# Échantillonnage à 1% des dossiers sains pour éviter la sur-impression visuelle 
-# et alléger la mémoire, tout en conservant 100% des anomalies pour bien marquer la rupture.
+# Sous-échantillonne les dossiers sains (1 %) pour éviter la saturation graphique (overplotting)
 df_anomalies_apport <- d %>% filter(down_payment_amount >= vehicle_price)
 df_conformes_sample <- d %>% filter(down_payment_amount < vehicle_price) %>% sample_frac(0.01)
 
-p_apport_prix <- bind_rows(df_anomalies_apport, df_conformes_sample) %>%
+# Nuage de points comparant Apport vs Prix
+p_apport_prix <- bind_rows(df_anomalies_apport, df_conformes_sample) %>% # On rassemble les 2
   ggplot(aes(x = vehicle_price, y = down_payment_amount,
              color = down_payment_amount >= vehicle_price)) +
-  geom_point(alpha = 0.5) +
+  geom_point(alpha = 0.5) + 
+  # Trace la ligne d'égalité parfaite (pente de 1, intersection à 0)
   geom_abline(slope = 1, intercept = 0, color = "red", linetype = "dashed") +
+  # La couleur du point dépend de la condition logique (Apport >= Prix)
   scale_color_manual(values = c("FALSE" = "black", "TRUE" = "red"),
                      labels = c("Conforme (échantillon 1%)", "Anomalie (100% affichées)")) +
   labs(title = "Cohérence financière : apport initial vs prix du véhicule",
        x = "Prix du véhicule", y = "Apport initial", color = "Statut") +
   theme(legend.position = "bottom")
 
-
-# Visualisation des incohérences croisées entre le statut de défaut officiel 
-# et les jours de retard réels (identification des faux positifs et faux négatifs).
+# Barplot empilé pour les incohérences de définition de défaut
 p_defaut_retard <- ggplot(ctrl, aes(x = type_incoherence_defaut, fill = type_incoherence_defaut)) +
   geom_bar(color = "black", show.legend = FALSE) +
   scale_fill_manual(values = c("Conforme" = "#43d95c", 
                                "Sous-estimation (retard >= 90j, non marqué en défaut)" = "#cdb8f2", 
                                "Sur-estimation (marqué en défaut, retard < 90j)" = "#2f64b5")) +
+  # after_stat(count) récupère le compte interne de ggplot pour l'afficher en texte
   geom_text(stat = "count", aes(label = after_stat(count)), hjust = -0.1, size = 3, color = "black") +
   coord_flip() +
   scale_y_continuous(expand = expansion_haut) +
   labs(title = "Statut de défaut vs jours de retard", x = NULL, y = "Nombre de contrats") +
-  theme_minimal() # Plus clair avec ce thème ici
+  theme_minimal() 
 
-
+# Histogramme des dates
 p_octrois <- ggplot(ctrl, aes(x = date_octroi)) +
-  geom_histogram(binwidth = 30, fill = "#43d95c", color = "black") +
+  geom_histogram(binwidth = 30, fill = "#43d95c", color = "black") + # Regroupe les dates par périodes de 30 jours
   geom_vline(xintercept = as.numeric(c(debut_prod, fin_prod)), color = "red", linetype = "dashed") +
+  # Marque la fenêtre légale avec deux lignes verticales rouges
   labs(title = "Distribution des dates d'octroi",
        subtitle = "En rouge : période réglementaire attendue (2020-2022)",
        x = "Date d'octroi", y = "Nombre de contrats") 
 
 
-p_defaut_statut <- d %>%
-  group_by(employment_status) %>%
-  summarise(taux_defaut_pct = round(100 * mean(default_flag), 2)) %>%
-  ggplot(aes(x = reorder(employment_status, taux_defaut_pct), y = taux_defaut_pct)) +
-  geom_col(fill = "#2f64b5", color = "black") +
-  coord_flip() +
-  labs(title = "Taux de défaut par statut professionnel", x = NULL, y = "% de défaut")
+# On va démontrer le décrochage du risque de défaut à partir de 60% d'endettement total.
+taux_ref <- 100 * mean(ctrl$default_flag[!ctrl$flag_SOLV_endettement_total_sup_60], na.rm = TRUE)
 
-
-# Justification visuelle du seuil critique d'endettement : démontre le décrochage 
-# du risque de défaut à partir de 60% d'endettement total.
 p_endettement_defaut <- ctrl %>%
   filter(!is.na(taux_total) & taux_total <= 100) %>%
-  mutate(tranche_endettement = cut(taux_total, breaks = seq(0, 100, by = 10))) %>%
+  mutate(tranche_endettement = cut(taux_total, breaks = seq(0, 100, by = 10))) %>% # On coupe en tranche de 10%
   group_by(tranche_endettement) %>%
   summarise(taux_defaut_pct = round(100 * mean(default_flag), 2)) %>%
   filter(!is.na(tranche_endettement)) %>%
   ggplot(aes(x = tranche_endettement, y = taux_defaut_pct)) +
-  geom_col(fill = "#2f64b5", color = "black") +
-  geom_hline(yintercept = 7.11, color = "red", linetype = "dashed") +
+  geom_col(fill = "#2f64b5", color = "black") +   # Ligne rouge horizontale calculée via taux_ref pour marquer le décrochage
+  geom_hline(yintercept = taux_ref, color = "red", linetype = "dashed") +
   labs(title = "Taux de défaut selon la tranche d'endettement total",
        subtitle = "Ligne rouge : taux moyen hors surendettement",
        x = "Tranche d'endettement (%)", y = "% de défaut")
@@ -572,13 +594,12 @@ p_endettement_defaut <- ctrl %>%
 
 print(p_age)
 print(p_revenu_brut) # Pour bien voir les outliers
-print(p_revenu_zoom) # Comprendre à quoi ressemble nos vraies nos vraies données
+print(p_revenu_zoom) # Comprendre à quoi ressemble nos vraies données
 print(p_top_anomalies)
 print(p_nb_anomalies) # On voit bien que généralement on en a pas mais que il peut y en avoir entre 1 et 10 par contrat
 print(p_apport_prix) # Différence entre apport et le prix du véhicule
 print(p_defaut_retard)
-print(p_octrois) # On s'arrure que les dates vont être là où l'on veut
-print(p_defaut_statut) # Le statut sans emploi va être le plus propice aux erreurs car c'est celui qui va jouer sur les variables d'argent
+print(p_octrois) # On s'assure que les dates vont être là où l'on veut
 print(p_endettement_defaut) # Plus on est endetté plus on va être enclin à avoir des défauts de payement
 
 
