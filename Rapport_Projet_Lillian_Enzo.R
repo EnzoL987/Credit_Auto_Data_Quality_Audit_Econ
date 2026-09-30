@@ -113,9 +113,9 @@ domaines <- tribble(
   "loan_amount",             0,     NA,
   "monthly_installment",     0,     NA,
   "vehicle_mileage_km",      0,     NA,
-  "days_past_due",           0,     NA,
-  "loan_term_months", 0, NA,
-  "default_flag", 0, 1
+  "default_flag", 0, 1,
+  "days_past_due",           0,     as.numeric(date_obs - debut_prod),   # 1826 j : max théorique du retard
+  "loan_term_months",       12,     84
 )
 
 # 1a. Les 3 valeurs les plus fréquentes de chaque colonne numérique, avec leur statut vs domaine
@@ -132,14 +132,20 @@ top_valeurs <- map_dfr(cols_num, function(col) {
 print(as_tibble(top_valeurs), n = Inf)
 
 
-# 1b. Codes classiques (0 exclu : valeur légitime dans plusieurs colonnes)
-codes_classiques <- c(9999)
-scan_codes <- map_dfr(cols_num, function(col) {
+# 1b. Recherche spécifique de la valeur sentinelle 9999 sur les colonnes numériques
+valeur_sentinelle <- 9999
+
+scan_sentinelle <- map_dfr(cols_num, function(col) {
   d %>%
-    filter(.data[[col]] %in% codes_classiques) %>%
+    filter(.data[[col]] == valeur_sentinelle) %>%
     count(valeur = .data[[col]], name = "nb_lignes") %>%
-    mutate(colonne = col, pct_base = round(100 * nb_lignes / nrow(d), 3))
+    mutate(
+      colonne  = col,
+      pct_base = round(100 * nb_lignes / nrow(d), 3)
+    )
 })
+
+print(as_tibble(scan_sentinelle))
 
 # Conversion en tibble pour que "n = Inf" soit bien interprété :
 print(as_tibble(scan_codes), n = Inf)
@@ -163,20 +169,19 @@ options(na.print = NULL)
 print(as_tibble(scan_txt))
 print(lapply(d[cols_txt], table))
 
-# On a aucune erreur ici
+# Aucune modalité texte vide ou déguisée
 
 
-
-
-
-
-
-
-
-
-
-
-
+# 1d. Valeurs hors domaine les plus fréquentes par colonne (candidates directes à la sentinelle)
+hors_domaine_detail <- map_dfr(domaines$colonne, function(col) {
+  b <- domaines %>% filter(colonne == col)
+  d %>%
+    filter(.data[[col]] < b$min | (!is.na(b$max) & .data[[col]] > b$max)) %>%
+    count(valeur = .data[[col]], name = "nb_lignes", sort = TRUE) %>%
+    slice_head(n = 5) %>%
+    mutate(colonne = col, pct_base = round(100 * nb_lignes / nrow(d), 3))
+})
+print(as_tibble(hors_domaine_detail), n = Inf)
 
 
 
@@ -335,6 +340,24 @@ stopifnot(identical(dim(d), dim_originale))
 
 
 
+
+taux_anomalie_par_pays <- ctrl %>%
+  group_by(country) %>%
+  summarise(
+    total_dossiers = n(),
+    pct_dpd_9999   = round(100 * mean(flag_VAL_dpd_9999), 3),
+    pct_age_hors_bornes = round(100 * mean(flag_VAL_age_hors_18_80), 3),
+    pct_mensualite_inc  = round(100 * mean(flag_COH_mensualite_incoherente, na.rm = TRUE), 3),
+    pct_au_moins_une    = round(100 * mean(au_moins_une), 2)
+  )
+
+print(as_tibble(taux_anomalie_par_pays), n = Inf)
+
+
+
+
+
+
 ## 4. SYNTHESE CHIFFREE (nb et % de lignes touchées par contrôle)
 
 
@@ -442,65 +465,8 @@ print(ctrl %>% group_by(au_moins_une) %>%
         summarise(nb = n(), taux_defaut_pct = round(100 * mean(default_flag), 2)))
 
 
-## 7. TESTS :
 
-
-# Test du Khi2 d'independance : anomalie <-> defaut
-tab_chi2 <- table(ctrl$au_moins_une, ctrl$default_flag)
-cat("\nTest du Khi2 (anomalie <-> defaut) :\n")
-print(tab_chi2)
-print(round(100 * prop.table(tab_chi2, 1), 2))
-print(chisq.test(tab_chi2))
-
-
-cat("\nTaux de defaut - endettement total > 60% :\n")
-print(ctrl %>% group_by(flag_SOLV_endettement_total_sup_60) %>%
-        summarise(nb = n(), taux_defaut_pct = round(100 * mean(default_flag), 2)))
-
-
-# Sensibilite des indicateurs (moyenne, mediane) aux valeurs hors domaine, calculee SANS modifier `d`
-cat("\nIndicateurs bruts (toutes lignes) :\n")
-print(d %>% summarise(
-  moy_revenu = mean(monthly_net_income), med_revenu = median(monthly_net_income),
-  moy_prix = mean(vehicle_price), med_prix = median(vehicle_price),
-  moy_age = mean(borrower_age), med_age = median(borrower_age)
-))
-
-cat("\nIndicateurs apres exclusion des valeurs hors domaine :\n")
-print(d %>%
-        filter(monthly_net_income >= 750, monthly_net_income <= 15000,
-               vehicle_price >= 4000, vehicle_price <= 140000,
-               borrower_age >= 18, borrower_age <= 80) %>%
-        summarise(
-          moy_revenu = mean(monthly_net_income), med_revenu = median(monthly_net_income),
-          moy_prix = mean(vehicle_price), med_prix = median(vehicle_price),
-          moy_age = mean(borrower_age), med_age = median(borrower_age)
-        ))
-# -> La moyenne est très sensible aux valeurs extremes, la mediane est robuste
-
-cat("\nCorrelation revenu/mensualite (brute) :",
-    round(cor(d$monthly_net_income, d$monthly_installment), 4), "\n")
-d_sans_extremes <- d %>% filter(monthly_net_income >= 750, monthly_net_income <= 15000)
-cat("Correlation revenu/mensualite (hors extremes) :",
-    round(cor(d_sans_extremes$monthly_net_income, d_sans_extremes$monthly_installment), 4), "\n")
-
-cat("\nTaux de defaut par statut professionnel :\n")
-print(round(tapply(d$default_flag, d$employment_status, mean), 4))
-
-# Le taux d'endettement total differe-t-il selon le defaut ?
-set.seed(123)
-echantillon <- ctrl %>% filter(!is.na(taux_total)) %>% slice_sample(n = 5000)
-
-cat("\nTest de normalite (Shapiro, echantillon n=5000) :\n")
-print(shapiro.test(echantillon$taux_total))
-
-cat("\nDistribution non normale -> test non parametrique (Wilcoxon) + test t pour comparaison :\n")
-print(wilcox.test(ctrl$taux_total ~ ctrl$default_flag))
-
-print(t.test(ctrl$taux_total ~ ctrl$default_flag))
-
-
-## 8. GRAPHIQUES :
+## 7. GRAPHIQUES :
 
 theme_set(theme_minimal())
 expansion_haut <- expansion(mult = c(0, 0.15))   # marge pour les étiquettes de %/effectifs
