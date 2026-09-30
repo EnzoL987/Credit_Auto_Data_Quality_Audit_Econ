@@ -2,7 +2,7 @@
 "flag_COH_ancien_debut_avant_16_ans",2390,0.3
 "flag_COH_apport_sup_ou_egal_prix",5788,0.72
 "flag_COH_defaut_mais_dpd_lt90",8354,1.04
-"flag_COH_dpd_ge90_mais_sain",8771,1.09
+"flag_COH_dpd_ge90_mais_sain",8036,1
 "flag_COH_ltv_incoherent",11596,1.44
 "flag_COH_mensualite_incoherente",39441,4.91
 "flag_COH_neuf_avec_age_positif",12739,1.59
@@ -22,7 +22,6 @@
 "flag_PLA_revenu_aberrant",4006,0.5
 "flag_PLA_sans_emploi_revenu_sup_5000",1285,0.16
 "flag_SOLV_charges_sup_100_du_revenu",41456,5.16
-"flag_SOLV_endettement_total_sup_35",465424,57.94
 "flag_SOLV_endettement_total_sup_60",171015,21.29
 "flag_SOLV_mensualite_sup_revenu",24806,3.09
 "flag_SOLV_prix_sup_3_ans_de_revenu",27279,3.4
