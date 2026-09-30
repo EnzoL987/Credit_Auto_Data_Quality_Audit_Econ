@@ -560,7 +560,7 @@ p_defaut_retard <- ggplot(ctrl, aes(x = type_incoherence_defaut, fill = type_inc
   coord_flip() +
   scale_y_continuous(expand = expansion_haut) +
   labs(title = "Statut de défaut vs jours de retard", x = NULL, y = "Nombre de contrats") +
-  theme_minimal() 
+  theme_minimal() # Ce theme correspond mieux pour ce graph
 
 # Histogramme des dates
 p_octrois <- ggplot(ctrl, aes(x = date_octroi)) +
