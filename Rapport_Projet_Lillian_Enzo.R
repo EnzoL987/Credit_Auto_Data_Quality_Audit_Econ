@@ -549,18 +549,19 @@ p_apport_prix <- bind_rows(df_anomalies_apport, df_conformes_sample) %>% # On ra
        x = "Prix du véhicule", y = "Apport initial", color = "Statut") +
   theme(legend.position = "bottom")
 
-# Barplot empilé pour les incohérences de définition de défaut
+# Plusieurs barplots sur les incohérences de définition de défaut
 p_defaut_retard <- ggplot(ctrl, aes(x = type_incoherence_defaut, fill = type_incoherence_defaut)) +
   geom_bar(color = "black", show.legend = FALSE) +
   scale_fill_manual(values = c("Conforme" = "#43d95c", 
                                "Sous-estimation (retard >= 90j, non marqué en défaut)" = "#cdb8f2", 
                                "Sur-estimation (marqué en défaut, retard < 90j)" = "#2f64b5")) +
   # after_stat(count) récupère le compte interne de ggplot pour l'afficher en texte
-  geom_text(stat = "count", aes(label = after_stat(count)), hjust = -0.1, size = 3, color = "black") +
+  geom_text(stat = "count", aes(label = after_stat(count)), hjust = -0.1, size = 3.5, color = "black") +
   coord_flip() +
   scale_y_continuous(expand = expansion_haut) +
   labs(title = "Statut de défaut vs jours de retard", x = NULL, y = "Nombre de contrats") +
   theme_minimal() # Ce theme correspond mieux pour ce graph
+
 
 # Histogramme des dates
 p_octrois <- ggplot(ctrl, aes(x = date_octroi)) +
