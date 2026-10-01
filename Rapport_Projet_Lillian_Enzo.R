@@ -499,16 +499,25 @@ p_age <- ggplot(d, aes(x = borrower_age)) +
   # Trace deux barrières verticales rouges pour montrer les limites d'âge (18 et 80)
   labs(title = "Répartition de l'âge des emprunteurs", x = "Âge", y = "Effectif")
 
-# Boîte à moustaches globale pour observer l'écrasement visuel dû aux valeurs extrêmes
+# Boîte à moustaches globale : mise en évidence de la saturation due aux valeurs extrêmes
 p_revenu_brut <- ggplot(d, aes(x = "", y = monthly_net_income)) +
-  geom_boxplot(fill = "#2f64b5", color = "black") +
-  labs(title = "Revenu net mensuel (brut)", x = NULL, y = "EUR")
+  geom_boxplot(fill = "#2f64b5", color = "black", 
+               outlier.color = "red", outlier.alpha = 0.3, outlier.size = 1.5) +
+  # Formatage propre des axes (ajoute un espace des milliers et le sigle euro)
+  scale_y_continuous(labels = function(x) paste0(format(x, big.mark = " ", scientific = FALSE), " €")) +
+  labs(title = "Revenu net mensuel (Vue globale)", 
+       subtitle = "L'écrasement de la boîte révèle l'ampleur des valeurs aberrantes",
+       x = NULL, y = NULL)
 
-# On fait ici le zoom sur le boxplot
+# Zoom sur le domaine réglementaire 
 p_revenu_zoom <- ggplot(d, aes(x = "", y = monthly_net_income)) +
-  geom_boxplot(fill = "#2f64b5", color = "black") +
-  coord_cartesian(ylim = c(0, 15000)) + # On fixe les limites de l'axe Y
-  labs(title = "Revenu net mensuel (zoom 0-15 000, domaine du dictionnaire)", x = NULL, y = "EUR")
+  geom_boxplot(fill = "#2f64b5", color = "black", 
+               outlier.color = "#cdb8f2", outlier.alpha = 0.5) +
+  coord_cartesian(ylim = c(0, 15000)) + 
+  scale_y_continuous(labels = function(x) paste0(format(x, big.mark = " ", scientific = FALSE), " €")) +
+  labs(title = "Revenu net mensuel (Zoom analytique)", 
+       subtitle = "Distribution recentrée sur le domaine du dictionnaire (0 - 15 000 €)",
+       x = NULL, y = NULL)
 
 
 # Graph utilisé avec la majorité des détails qu'on utilise sur les autres graphs :
@@ -591,6 +600,25 @@ p_endettement_defaut <- ctrl %>%
        x = "Tranche d'endettement (%)", y = "% de défaut")
 
 
+# Sous-échantillonnage des dossiers sains (1 %) pour lisibilité
+df_tmp_anomalies <- ctrl %>% filter(flag_TMP_anciennete_vs_dates == TRUE)
+df_tmp_conformes <- ctrl %>% filter(flag_TMP_anciennete_vs_dates == FALSE) %>% sample_frac(0.01)
+
+p_coherence_anciennete <- bind_rows(df_tmp_anomalies, df_tmp_conformes) %>%
+  ggplot(aes(x = job_seniority_years, y = anciennete_dates, 
+             color = flag_TMP_anciennete_vs_dates)) +
+  geom_point(alpha = 0.5) + 
+  # Ligne d'égalité parfaite (l'ancienneté déclarée correspond exactement aux dates)
+  geom_abline(slope = 1, intercept = 0, color = "red", linetype = "dashed") +
+  scale_color_manual(values = c("FALSE" = "#2f64b5", "TRUE" = "#cdb8f2"),
+                     labels = c("Conforme (échantillon 1%)", "Anomalie (> 1 an d'écart)")) +
+  labs(title = "Incohérences temporelles sur l'ancienneté socio-professionnelle",
+       subtitle = "La ligne rouge représente une parfaite correspondance",
+       x = "Ancienneté déclarée au dossier (années)", 
+       y = "Ancienneté calculée par l'horodatage (années)", 
+       color = "Statut")
+
+
 # Sorties des graphiques :
 
 print(p_age)
@@ -602,6 +630,7 @@ print(p_apport_prix) # Différence entre apport et le prix du véhicule
 print(p_defaut_retard)
 print(p_octrois) # On s'assure que les dates vont être là où l'on veut
 print(p_endettement_defaut) # Plus on est endetté plus on va être enclin à avoir des défauts de payement
+print(p_coherence_anciennete)
 
 
 
