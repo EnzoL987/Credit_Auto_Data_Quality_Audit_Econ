@@ -90,7 +90,7 @@ scan_sentinelle <- map_dfr(cols_num, function(col) {
 # Affichage des sentinelles numériques :
 print(as_tibble(scan_sentinelle), n = Inf)
 
-cat("\n PREUVE MATHÉMATIQUE DU CODE SENTINELLE 9999 (Analyse des pics) \n")
+cat("\n VÉRIFICATION DU CODE SENTINELLE 9999 (Analyse des pics) \n")
 
 # On compare l'occurrence de 9999 par rapport à la moyenne de ses 20 voisins directs
 # -> On cherche à savoir si c'est un vrai 9999 ou une valeur qu'on a mit car NA
@@ -105,7 +105,7 @@ pic_sentinelle <- map_dfr(unique(scan_sentinelle$colonne), function(col) {
 print(pic_sentinelle)
 # Si nb_9999 est anormalement supérieur à moyenne_voisins, cela confirme qu'il 
 # s'agit d'une valeur manquante déguisée (faux NA) et non d'une saisie naturelle.
-# Ici on va donc probablement avoir que days_pas_due avec ces faux NA .
+# Ici on va donc probablement avoir que days_pas_due avec ces faux NA.
 
 
 # 2. Colonnes texte : modalités "vides" déguisées, et liste complète des modalités
