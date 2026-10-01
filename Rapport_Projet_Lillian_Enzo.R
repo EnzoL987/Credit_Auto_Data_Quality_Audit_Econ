@@ -90,6 +90,7 @@ scan_sentinelle <- map_dfr(cols_num, function(col) {
 # Affichage des sentinelles numériques :
 print(as_tibble(scan_sentinelle), n = Inf)
 
+
 cat("\n VÉRIFICATION DU CODE SENTINELLE 9999 (Analyse des pics) \n")
 
 # On compare l'occurrence de 9999 par rapport à la moyenne de ses 20 voisins directs
@@ -340,13 +341,13 @@ print(tableau_synthese)
 
 cat("\n EXEMPLES DE LIGNES PROBLEMATIQUES \n")
 
-cat("\n Âge hors limites (18-80 ans) :\n")
+cat("\n Âge hors limites (18-80 ans) :\nQ")
 # On trie par âge croissant pour faire remonter immédiatement les cas choquants.
 print(ctrl %>% 
         filter(flag_VAL_age_hors_18_80) %>%
         arrange(borrower_age) %>% 
         select(loan_id, borrower_age, employment_status, loan_amount) %>% 
-        head(5))
+        head(3))
 
 
 cat("\n Retard >= 90j mais marqué sain (Les retards les plus longs) :\n")
@@ -354,7 +355,7 @@ print(ctrl %>%
         filter(flag_COH_dpd_ge90_mais_sain) %>%
         arrange(desc(days_past_due)) %>% 
         select(loan_id, days_past_due, default_flag) %>% 
-        head(5))
+        head(3))
 
 
 cat("\n Mensualité incohérente vs formule d'amortissement (Les plus grands écarts) :\n")
@@ -363,7 +364,7 @@ print(ctrl %>%
         mutate(ecart_euros = abs(monthly_installment - mensualite_theo)) %>%
         arrange(desc(ecart_euros)) %>% 
         select(loan_id, loan_amount, interest_rate_pct, monthly_installment, mensualite_theo) %>% 
-        head(5))
+        head(3))
 
 
 cat("\n Incohérence métier : Retraités avec de l'ancienneté professionnelle :\n")
@@ -371,7 +372,7 @@ print(ctrl %>%
         filter(flag_COH_retraite_avec_anciennete) %>%
         arrange(desc(job_seniority_years)) %>% # On montre les retraités avec 40 ans d'ancienneté "en cours"
         select(loan_id, employment_status, borrower_age, job_seniority_years) %>% 
-        head(5))
+        head(3))
 
 
 cat("\n Revenus aberrants (valeurs négatives ou nulles) :\n")
@@ -379,7 +380,7 @@ print(ctrl %>%
         filter(flag_PLA_revenu_aberrant, monthly_net_income <= 0) %>%
         arrange(monthly_net_income) %>% # Du plus négatif vers 0
         select(loan_id, monthly_net_income, employment_status, loan_amount) %>% 
-        head(5))
+        head(3))
 
 
 cat("\n Revenus aberrants (valeurs extrêmes positives > 50 000 EUR) :\n")
@@ -387,7 +388,7 @@ print(ctrl %>%
         filter(flag_PLA_revenu_aberrant, monthly_net_income > 50000) %>%
         arrange(desc(monthly_net_income)) %>% # Du plus élevé au moins élevé
         select(loan_id, monthly_net_income, employment_status, loan_amount) %>% 
-        head(5))
+        head(3))
 
 
 cat("\n Solvabilité : Mensualité supérieure au revenu (Les pires ratios) :\n")
@@ -400,7 +401,7 @@ print(ctrl %>%
 
 cat("\n VERIFICATIONS GLOBALES \n")
 
-cat(" Fenetre de performance de 24 mois complete pour tous les prets ? (0 attendu) :",
+cat(" Fenetre de performance de 24 mois complete pour tous les prets ? :",
     sum(ctrl$date_octroi + 730 > date_obs), "\n")
 
 cat("Prets dont la duree en mois est plus courte que la fenetre d'observation (24 mois) :",
@@ -588,7 +589,6 @@ p_endettement_defaut <- ctrl %>%
   labs(title = "Taux de défaut selon la tranche d'endettement total",
        subtitle = "Ligne rouge : taux moyen hors surendettement",
        x = "Tranche d'endettement (%)", y = "% de défaut")
-
 
 
 # Sorties des graphiques :
