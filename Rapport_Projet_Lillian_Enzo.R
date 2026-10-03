@@ -94,7 +94,7 @@ print(as_tibble(scan_sentinelle), n = Inf)
 cat("\n VÉRIFICATION DU CODE SENTINELLE 9999 (Analyse des pics) \n")
 
 # On compare l'occurrence de 9999 par rapport à la moyenne de ses 20 voisins directs
-# -> On cherche à savoir si c'est un vrai 9999 ou une valeur qu'on a mit car NA
+# -> On cherche à savoir si c'est un vrai 9999 ou une valeur fabriqué car on a un NA
 pic_sentinelle <- map_dfr(unique(scan_sentinelle$colonne), function(col) {
   tibble(
     colonne = col,
@@ -293,7 +293,7 @@ ctrl <- d %>%
     flag_TMP_debut_emploi_apres_octroi = date_debut_emploi > date_octroi,
     flag_TMP_debut_emploi_apres_arrete = date_debut_emploi > date_obs,
     flag_TMP_anciennete_vs_dates = abs(anciennete_dates - job_seniority_years) > 1,
-    flag_TMP_debut_emploi_avant_15_ans = (borrower_age - anciennete_dates) < 15,
+    flag_TMP_debut_emploi_avant_16_ans = (borrower_age - anciennete_dates) < 16,
     flag_TMP_dpd_sup_jours_ecoules = days_past_due != 9999 & days_past_due > as.numeric(date_obs - date_octroi),
     flag_TMP_dpd_sup_730 = days_past_due != 9999 & days_past_due > 730   # fenêtre de performance = 24 mois
   )
@@ -336,12 +336,28 @@ print(tableau_synthese)
 
 
 
+# Récupère tous les noms de colonnes de ctrl qui commencent par "flag_"
+flags <- grep("^flag_", names(ctrl), value = TRUE)
+# On enlève ceux reliés à la solvabilité qui va nous intéresser que pour les tests
+flags <- flags[!grepl("SOL", flags, ignore.case = TRUE)]  
+
+# On fait la somme des lignes qui ont au moins un flag
+n_any <- sum(rowSums(ctrl[flags], na.rm = TRUE) > 0)
+
+# Crée un vecteur avec le total et le %
+resultats <- c(n_any, round(100 * n_any / nrow(ctrl), 2))
+
+
+cat(sprintf("Bilan global : %d dossiers présentent au moins une anomalie (soit %.2f %% de la base).\n", resultats[1], resultats[2]))
+
+
+
 ## V. EXEMPLES DE LIGNES PROBLEMATIQUES (Sélection des pires cas) :
 
 
 cat("\n EXEMPLES DE LIGNES PROBLEMATIQUES \n")
 
-cat("\n Âge hors limites (18-80 ans) :\nQ")
+cat("\n Âge hors limites (18-80 ans) :\n")
 # On trie par âge croissant pour faire remonter immédiatement les cas choquants.
 print(ctrl %>% 
         filter(flag_VAL_age_hors_18_80) %>%
@@ -474,7 +490,6 @@ cat("\n Test-t (Sur données nettoyées) :\n")
 print(t.test(taux_total ~ default_flag, data = ctrl_propre))
 
 
-
 ## VII. GRAPHIQUES :
 
 theme_set(
@@ -543,6 +558,7 @@ p_nb_anomalies <- ggplot(ctrl, aes(x = nb_anomalies)) +
 
 # Sous-échantillonne les dossiers sains (1 %) pour éviter la saturation graphique (overplotting)
 df_anomalies_apport <- d %>% filter(down_payment_amount >= vehicle_price)
+set.seed(123) 
 df_conformes_sample <- d %>% filter(down_payment_amount < vehicle_price) %>% sample_frac(0.01)
 
 # Nuage de points comparant Apport vs Prix
@@ -602,6 +618,7 @@ p_endettement_defaut <- ctrl %>%
 
 # Sous-échantillonnage des dossiers sains (1 %) pour lisibilité
 df_tmp_anomalies <- ctrl %>% filter(flag_TMP_anciennete_vs_dates == TRUE)
+set.seed(123)
 df_tmp_conformes <- ctrl %>% filter(flag_TMP_anciennete_vs_dates == FALSE) %>% sample_frac(0.01)
 
 p_coherence_anciennete <- bind_rows(df_tmp_anomalies, df_tmp_conformes) %>%
@@ -634,7 +651,7 @@ print(p_coherence_anciennete)
 
 
 
-cat("Base brute inchangee :", identical(dim(d), dim_originale), "\n")
 
+cat("Base brute inchangee :", identical(dim(d), dim_originale), "\n")
 
 
