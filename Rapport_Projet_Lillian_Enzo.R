@@ -121,8 +121,7 @@ scan_txt <- map_dfr(cols_txt, function(col) {
     mutate(colonne = col)
 })
 
-# Réinitialisation de sécurité de l'option globale et affichage
-options(na.print = NULL)
+
 print(as_tibble(scan_txt))
 print(lapply(d[cols_txt], table))
 
@@ -319,7 +318,7 @@ cat("\n SYNTHESE DES CONTROLES \n")
 print(synthese, row.names = FALSE)
 
 # Sortie d'un .csv avec le tableau des anomalies :
-write.csv(synthese, "synthese_anomalies.csv", row.names = FALSE)
+# write.csv(synthese, "synthese_anomalies.csv", row.names = FALSE)
 
 # Création d'un beau tableau global avec kable (l'équivalent du tableau .csv mais ici) :
 
@@ -331,22 +330,6 @@ tableau_synthese <- synthese %>%
   ) 
 
 print(tableau_synthese)
-
-
-
-# Récupère tous les noms de colonnes de ctrl qui commencent par "flag_"
-flags <- grep("^flag_", names(ctrl), value = TRUE)
-# On enlève ceux reliés à la solvabilité qui va nous intéresser que pour les tests
-flags <- flags[!grepl("SOL", flags, ignore.case = TRUE)]  
-
-# On fait la somme des lignes qui ont au moins un flag
-n_any <- sum(rowSums(ctrl[flags], na.rm = TRUE) > 0)
-
-# Crée un vecteur avec le total et le %
-resultats <- c(n_any, round(100 * n_any / nrow(ctrl), 2))
-
-
-cat(sprintf("Bilan global : %d dossiers présentent au moins une anomalie (soit %.2f %% de la base).\n", resultats[1], resultats[2]))
 
 
 
@@ -418,8 +401,6 @@ cat("\n VERIFICATIONS GLOBALES \n")
 cat(" Fenetre de performance de 24 mois complete pour tous les prets ? :",
     sum(ctrl$date_octroi + 730 > date_obs), "\n")
 
-cat("Prets dont la duree en mois est plus courte que la fenetre d'observation (24 mois) :",
-    sum(d$loan_term_months < 24), "\n")
 
 cat("Repartition des octrois par annee :\n")
 print(table(format(ctrl$date_octroi, "%Y")))
@@ -453,13 +434,23 @@ ctrl$anom_noyau <- rowSums(fl_noyau, na.rm = TRUE) > 0
 print(ctrl %>% group_by(anom_noyau) %>% summarise(nb = n(), taux_defaut_pct = round(100 * mean(default_flag), 2)))
 
 
+# qui explique l'écart brut ?
+fl_dpd    <- flags_donnees %>% select(matches("dpd|default|defaut|9999"))
+fl_statut <- flags_donnees %>% select(flag_COH_retraite_avec_anciennete,
+                                      flag_COH_retraite_moins_de_55_ans,
+                                      flag_COH_sans_emploi_avec_anciennete)
+ctrl$anom_dpd    <- rowSums(fl_dpd,    na.rm = TRUE) > 0
+ctrl$anom_statut <- rowSums(fl_statut, na.rm = TRUE) > 0
+print(ctrl %>% group_by(anom_dpd, anom_statut) %>%
+        summarise(nb = n(), taux_defaut_pct = round(100 * mean(default_flag), 2), .groups = "drop"))
+
+# Ce croisement démontre que les anomalies sur les retards font bondir le taux de défaut de 6,38 % à 45 %, 
+# prouvant que la corruption de la variable cible fausse directement la mesure du risque, tandis que les incohérences de statut reflètent
+# une sinistralité légèrement accrue (7,92 %).
+
+
+
 cat("\n IMPACT DES ANOMALIES \n")
-
-cat("Repartition du nombre d'anomalies par contrat :\n")
-print(table(ctrl$nb_anomalies))
-
-cat("% de lignes avec au moins 1 anomalie :", round(100 * mean(ctrl$au_moins_une), 2), "\n")
-cat("% de lignes avec 3 anomalies ou plus :", round(100 * mean(ctrl$nb_anomalies >= 3), 2), "\n")
 
 
 cat("\nTaux de defaut selon la presence d'une anomalie de donnee :\n")
@@ -476,19 +467,22 @@ cat("Valeurs négatives (union) :", sum(ctrl$flag_VAL_dpd_negatif | ctrl$flag_VA
 
 # Tableau de synthèse par dimension (lignes distinctes)
 dims <- c("COM","UNI","VAL","COH","PLA","TMP")
-par_dim <- sapply(dims, function(p) {
+mat_dim <- sapply(dims, function(p) {
   cols <- grepl(paste0("^flag_", p, "_"), names(flags_donnees))
-  sum(rowSums(flags_donnees[, cols, drop = FALSE], na.rm = TRUE) > 0)
+  rowSums(flags_donnees[, cols, drop = FALSE], na.rm = TRUE) > 0
 })
+
+ctrl$nb_dimensions <- rowSums(mat_dim)
+
+par_dim <- colSums(mat_dim)
 print(data.frame(dimension = dims, nb = par_dim, pct = round(100 * par_dim / nrow(d), 2)))
 
 
+# Union pour la ligne 7 du tableau de cohérence
+cat("Montant prêt incohérent (union) :",
+    sum(ctrl$flag_COH_pret_diff_prix_moins_apport | ctrl$flag_COH_ltv_incoherent), "\n")
 
-fl_sans_ret <- flags_donnees %>%
-  select(-flag_COH_retraite_avec_anciennete, -flag_COH_retraite_moins_de_55_ans)
 
-cat("% de lignes avec >= 1 anomalie, hors contrôles 'retraité' :",
-    round(100 * mean(rowSums(fl_sans_ret, na.rm = TRUE) > 0), 2), "\n")
 
 is_ret <- d$employment_status == "Retraité"
 cat("Retraités au total :", sum(is_ret), "\n")
@@ -506,18 +500,22 @@ diag_ret <- d %>%
 print(diag_ret)
 
 # Ancienneté déclarée : retraités vs autres statuts
-d %>% group_by(retraite = employment_status == "Retraité") %>%
+retraite_vs_statut <- d %>% group_by(retraite = employment_status == "Retraité") %>%
   summarise(anciennete_moy = round(mean(job_seniority_years), 1),
             pct_anciennete_nulle = round(100 * mean(job_seniority_years == 0), 1))
+print(retraite_vs_statut)
 
 
-d %>% filter(borrower_age >= 18, borrower_age <= 80) %>%
+age_filter <- d %>% filter(borrower_age >= 18, borrower_age <= 80) %>%
   mutate(tranche_age = cut(borrower_age, breaks = c(17, 25, 35, 45, 55, 65, 80))) %>%
   count(tranche_age, employment_status) %>%
   group_by(tranche_age) %>% mutate(pct = round(100 * n / sum(n), 1)) %>%
   select(-n) %>% pivot_wider(names_from = employment_status, values_from = pct)
+print(age_filter)
 
-d %>% group_by(employment_status) %>% summarise(nb = n(), taux_defaut_pct = round(100 * mean(default_flag), 2))
+
+summary_statut <- d %>% group_by(employment_status) %>% summarise(nb = n(), taux_defaut_pct = round(100 * mean(default_flag), 2))
+print(summary_statut)
 
 
 cat("Identifiants distincts :", n_distinct(d$loan_id), "| lignes en excès :", nrow(d) - n_distinct(d$loan_id), "\n")
@@ -552,7 +550,7 @@ phi <- sqrt(unname(test_khi2$statistic) / sum(tab_chi2))
 cat("Taille d'effet (Coefficient Phi) :", round(phi, 3), "\n")
 
 # Tests de Wilcoxon et t-test sur la base nettoyé des valeurs aberrantes
-ctrl %>% filter(!anom_noyau)
+ctrl_propre <- ctrl %>% filter(!anom_noyau)
 
 cat("\n Test de Wilcoxon (Sur données nettoyées) :\n")
 print(wilcox.test(taux_total ~ default_flag, data = ctrl_propre))
@@ -580,32 +578,12 @@ theme_set(
 expansion_haut <- expansion(mult = c(0, 0.15))   
 
 
+
 p_age <- ggplot(d, aes(x = borrower_age)) +
   geom_histogram(binwidth = 1, fill = "#cdb8f2", color = "black") +
   geom_vline(xintercept = c(18, 80), color = "red", linetype = "dashed") + 
   # Trace deux barrières verticales rouges pour montrer les limites d'âge (18 et 80)
   labs(title = "Répartition de l'âge des emprunteurs", x = "Âge", y = "Effectif")
-
-# Boîte à moustaches globale : mise en évidence de la saturation due aux valeurs extrêmes
-p_revenu_brut <- ggplot(d, aes(x = "", y = monthly_net_income)) +
-  geom_boxplot(fill = "#2f64b5", color = "black", 
-               outlier.color = "red", outlier.alpha = 0.3, outlier.size = 1.5) +
-  # Formatage propre des axes (ajoute un espace des milliers et le sigle euro)
-  scale_y_continuous(labels = function(x) paste0(format(x, big.mark = " ", scientific = FALSE), " €")) +
-  labs(title = "Revenu net mensuel (Vue globale)", 
-       subtitle = "L'écrasement de la boîte révèle l'ampleur des valeurs aberrantes",
-       x = NULL, y = NULL)
-
-# Zoom sur le domaine réglementaire 
-p_revenu_zoom <- ggplot(d, aes(x = "", y = monthly_net_income)) +
-  geom_boxplot(fill = "#2f64b5", color = "black", 
-               outlier.color = "#cdb8f2", outlier.alpha = 0.5) +
-  coord_cartesian(ylim = c(0, 15000)) + 
-  scale_y_continuous(labels = function(x) paste0(format(x, big.mark = " ", scientific = FALSE), " €")) +
-  labs(title = "Revenu net mensuel (Zoom analytique)", 
-       subtitle = "Distribution recentrée sur le domaine du dictionnaire (0 - 15 000 €)",
-       x = NULL, y = NULL)
-
 
 # Graph utilisé avec la majorité des détails qu'on utilise sur les autres graphs :
 
@@ -613,6 +591,7 @@ p_top_anomalies <- synthese %>%
   filter(nb_lignes > 0) %>% # Conserve uniquement les contrôles ayant détecté au moins une erreur
   filter(!str_detect(controle, "SOLV")) %>% # Exclut les règles de solvabilité pour se concentrer sur la pure qualité des données
   slice_max(pct_base, n = 10, with_ties = FALSE) %>% # Top 10
+  mutate(controle = str_remove(controle, "^flag_")) %>% # On change les noms pour un plus beau tableau
   ggplot(aes(x = reorder(controle, pct_base), y = pct_base)) + # Définit les axes et arrange par fréquence
   geom_col(fill = "#cdb8f2", color = "black") + 
   geom_text(aes(label = paste0(pct_base, "%")), hjust = -0.1, size = 3, color = "black") + 
@@ -621,11 +600,6 @@ p_top_anomalies <- synthese %>%
   scale_y_continuous(expand = expansion_haut) + # Ajoute une marge à droite
   labs(title = "Top 10 des contrôles les plus touchés", x = NULL, y = "% de la base") # Labelisation
 
-
-# Diagramme à barres simple sur le nombre d'erreur
-p_nb_anomalies <- ggplot(ctrl, aes(x = nb_anomalies)) +
-  geom_bar(fill = "#cdb8f2", color = "black") + 
-  labs(title = "Nombre d'anomalies par contrat", x = "Nombre d'anomalies", y = "Nombre de contrats")
 
 
 # Sous-échantillonne les dossiers sains (1 %) pour éviter la saturation graphique (overplotting)
@@ -708,18 +682,44 @@ p_coherence_anciennete <- bind_rows(df_tmp_anomalies, df_tmp_conformes) %>%
        color = "Statut")
 
 
+df_km_anom <- ctrl %>%
+  filter(flag_PLA_occasion_km_inf_1000 | flag_PLA_occasion_km_par_an_sup_30000,
+         vehicle_mileage_km >= 0)
+set.seed(123)
+df_km_conf <- ctrl %>%
+  filter(vehicle_condition == "Occasion", vehicle_age_years > 0, vehicle_mileage_km >= 0,
+         !flag_PLA_occasion_km_inf_1000, !flag_PLA_occasion_km_par_an_sup_30000) %>%
+  sample_frac(0.01)
+
+p_km_age <- bind_rows(df_km_anom, df_km_conf) %>%
+  mutate(statut_km = case_when(
+    flag_PLA_occasion_km_inf_1000 ~ "< 1 000 km",
+    flag_PLA_occasion_km_par_an_sup_30000 ~ "> 30 000 km/an",
+    TRUE ~ "Conforme (échantillon 1 %)")) %>%
+  ggplot(aes(x = vehicle_age_years, y = vehicle_mileage_km, color = statut_km)) +
+  geom_jitter(width = 0.2, alpha = 0.4, size = 0.8) +
+  geom_abline(slope = 30000, intercept = 0, color = "red", linetype = "dashed") +
+  geom_hline(yintercept = 1000, color = "red", linetype = "dashed") +
+  coord_cartesian(ylim = c(0, 400000)) +
+  scale_color_manual(values = c("Conforme (échantillon 1 %)" = "#2f64b5",
+                                "< 1 000 km" = "#cdb8f2", "> 30 000 km/an" = "#43d95c")) +
+  labs(title = "Kilométrage des véhicules d'occasion selon leur âge",
+       subtitle = "Lignes rouges : seuils de 1 000 km et de 30 000 km/an",
+       x = "Âge du véhicule (années)", y = "Kilométrage (km)", color = "Statut")
+
+
+
+
 # Sorties des graphiques :
 
 print(p_age)
-print(p_revenu_brut) # Pour bien voir les outliers
-print(p_revenu_zoom) # Comprendre à quoi ressemble nos vraies données
 print(p_top_anomalies)
-print(p_nb_anomalies) # On voit bien que généralement on en a pas mais que il peut y en avoir entre 0 et 9 par contrat
 print(p_apport_prix) # Différence entre apport et le prix du véhicule
 print(p_defaut_retard)
 print(p_octrois) # On s'assure que les dates vont être là où l'on veut
 print(p_endettement_defaut) # Plus on est endetté plus on va être enclin à avoir des défauts de payement
 print(p_coherence_anciennete)
+print(p_km_age)
 
 
 
