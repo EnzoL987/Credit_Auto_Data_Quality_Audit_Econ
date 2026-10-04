@@ -104,9 +104,7 @@ pic_sentinelle <- map_dfr(unique(scan_sentinelle$colonne), function(col) {
 })
 
 print(pic_sentinelle)
-# Si nb_9999 est anormalement supérieur à moyenne_voisins, cela confirme qu'il 
-# s'agit d'une valeur manquante déguisée (faux NA) et non d'une saisie naturelle.
-# Ici on va donc probablement avoir que days_pas_due avec ces faux NA.
+
 
 
 # 2. Colonnes texte : modalités "vides" déguisées, et liste complète des modalités
@@ -181,7 +179,7 @@ ctrl <- d %>%
                                loan_amount * taux_mensuel / (1 - (1 + taux_mensuel)^(-loan_term_months)),
                                NA_real_),
     km_par_an = ifelse(vehicle_age_years > 0, vehicle_mileage_km / vehicle_age_years, NA),
-    # Taux d'effort du nouveau pret (% du revenu) ; NA si revenu <- 0 (division impossible)
+    # Taux d'effort du nouveau pret (% du revenu) ; NA si revenu <= 0 (division impossible)
     taux_effort = ifelse(monthly_net_income > 0, 100 * monthly_installment / monthly_net_income, NA),
     # Taux d'endettement total = dette existante + nouvelle mensualite
     taux_total= existing_debt_ratio + taux_effort,
@@ -278,7 +276,7 @@ ctrl <- d %>%
     
     
     flag_SOLV_mensualite_sup_revenu = monthly_installment > monthly_net_income,
-    flag_SOLV_endettement_total_sup_60 = !is.na(taux_total) & taux_total > 60,
+    flag_SOLV_endettement_total_sup_60 = ifelse(is.na(taux_total), NA, taux_total > 60),
     flag_SOLV_charges_sup_100_du_revenu = !is.na(taux_total) & taux_total >= 100,
     flag_SOLV_prix_sup_3_ans_de_revenu = vehicle_price > 36 * monthly_net_income,
     
@@ -321,7 +319,7 @@ cat("\n SYNTHESE DES CONTROLES \n")
 print(synthese, row.names = FALSE)
 
 # Sortie d'un .csv avec le tableau des anomalies :
-# write.csv(synthese, "synthese_anomalies.csv", row.names = FALSE)
+write.csv(synthese, "synthese_anomalies.csv", row.names = FALSE)
 
 # Création d'un beau tableau global avec kable (l'équivalent du tableau .csv mais ici) :
 
@@ -442,6 +440,19 @@ flags_donnees <- ctrl %>%
 ctrl$nb_anomalies <- rowSums(flags_donnees, na.rm = TRUE)
 ctrl$au_moins_une <- ctrl$nb_anomalies > 0
 
+
+# Noyau d'anomalies de saisie : on retire les flags de statut pro (structurels, touchent presque
+# toute une modalité) et les flags construits à partir du défaut/DPD (circularité)
+fl_sans_statut <- flags_donnees %>%
+  select(-flag_COH_retraite_avec_anciennete, -flag_COH_retraite_moins_de_55_ans,
+         -flag_COH_sans_emploi_avec_anciennete)
+cat("% >= 1 anomalie hors contrôles de statut :", round(100 * mean(rowSums(fl_sans_statut, na.rm = TRUE) > 0), 2), "\n")
+
+fl_noyau <- fl_sans_statut %>% select(-matches("dpd|default|defaut|9999"))
+ctrl$anom_noyau <- rowSums(fl_noyau, na.rm = TRUE) > 0
+print(ctrl %>% group_by(anom_noyau) %>% summarise(nb = n(), taux_defaut_pct = round(100 * mean(default_flag), 2)))
+
+
 cat("\n IMPACT DES ANOMALIES \n")
 
 cat("Repartition du nombre d'anomalies par contrat :\n")
@@ -454,6 +465,66 @@ cat("% de lignes avec 3 anomalies ou plus :", round(100 * mean(ctrl$nb_anomalies
 cat("\nTaux de defaut selon la presence d'une anomalie de donnee :\n")
 print(ctrl %>% group_by(au_moins_une) %>%
         summarise(nb = n(), taux_defaut_pct = round(100 * mean(default_flag), 2)))
+
+
+
+# nb_anomalies compte des FLAGS, pas des erreurs distinctes (une même erreur
+# peut déclencher plusieurs flags). Ne pas le lire comme un nombre d'erreurs indépendantes.
+
+cat("Véhicule état/âge/km (union) :", sum(ctrl$flag_COH_neuf_avec_age_positif | ctrl$flag_COH_neuf_km_sup_100 | ctrl$flag_COH_occasion_age_zero), "\n")
+cat("Valeurs négatives (union) :", sum(ctrl$flag_VAL_dpd_negatif | ctrl$flag_VAL_mensualite_negative | ctrl$flag_VAL_km_negatif), "\n")
+
+# Tableau de synthèse par dimension (lignes distinctes)
+dims <- c("COM","UNI","VAL","COH","PLA","TMP")
+par_dim <- sapply(dims, function(p) {
+  cols <- grepl(paste0("^flag_", p, "_"), names(flags_donnees))
+  sum(rowSums(flags_donnees[, cols, drop = FALSE], na.rm = TRUE) > 0)
+})
+print(data.frame(dimension = dims, nb = par_dim, pct = round(100 * par_dim / nrow(d), 2)))
+
+
+
+fl_sans_ret <- flags_donnees %>%
+  select(-flag_COH_retraite_avec_anciennete, -flag_COH_retraite_moins_de_55_ans)
+
+cat("% de lignes avec >= 1 anomalie, hors contrôles 'retraité' :",
+    round(100 * mean(rowSums(fl_sans_ret, na.rm = TRUE) > 0), 2), "\n")
+
+is_ret <- d$employment_status == "Retraité"
+cat("Retraités au total :", sum(is_ret), "\n")
+cat("dont ancienneté > 0 :", sum(is_ret & d$job_seniority_years > 0), "\n")
+print(sapply(c(55, 60, 62), function(s) sum(is_ret & d$borrower_age < s)))
+
+
+# Part de retraités par tranche d'âge (si elle est ~constante : statut sans lien avec l'âge)
+diag_ret <- d %>%
+  filter(borrower_age >= 18, borrower_age <= 80) %>%
+  mutate(tranche_age = cut(borrower_age, breaks = c(17, 25, 35, 45, 55, 65, 80))) %>%
+  group_by(tranche_age) %>%
+  summarise(nb = n(),
+            pct_retraites = round(100 * mean(employment_status == "Retraité"), 1))
+print(diag_ret)
+
+# Ancienneté déclarée : retraités vs autres statuts
+d %>% group_by(retraite = employment_status == "Retraité") %>%
+  summarise(anciennete_moy = round(mean(job_seniority_years), 1),
+            pct_anciennete_nulle = round(100 * mean(job_seniority_years == 0), 1))
+
+
+d %>% filter(borrower_age >= 18, borrower_age <= 80) %>%
+  mutate(tranche_age = cut(borrower_age, breaks = c(17, 25, 35, 45, 55, 65, 80))) %>%
+  count(tranche_age, employment_status) %>%
+  group_by(tranche_age) %>% mutate(pct = round(100 * n / sum(n), 1)) %>%
+  select(-n) %>% pivot_wider(names_from = employment_status, values_from = pct)
+
+d %>% group_by(employment_status) %>% summarise(nb = n(), taux_defaut_pct = round(100 * mean(default_flag), 2))
+
+
+cat("Identifiants distincts :", n_distinct(d$loan_id), "| lignes en excès :", nrow(d) - n_distinct(d$loan_id), "\n")
+cat("Conflits de clé (même loan_id, contenu différent) :", sum(lignes_id_dupliquees & !dup_ligne), "\n")
+print(sapply(c(17, 18, 19, 79, 80, 81), function(a) sum(d$borrower_age == a)))   # pic à 18 ans
+cat("% de dossiers anormaux touchant >= 2 dimensions :", round(100 * mean(ctrl$nb_dimensions[ctrl$au_moins_une] >= 2), 1), "\n")
+cat("Embauche après octroi ET conflit d'ancienneté :", sum(ctrl$flag_TMP_debut_emploi_apres_octroi & ctrl$flag_TMP_anciennete_vs_dates), "\n")
 
 
 # Ici on rajoute des Tests statistiques afin de souligner l'importance de ces changements avant l'inspection
@@ -481,13 +552,14 @@ phi <- sqrt(unname(test_khi2$statistic) / sum(tab_chi2))
 cat("Taille d'effet (Coefficient Phi) :", round(phi, 3), "\n")
 
 # Tests de Wilcoxon et t-test sur la base nettoyé des valeurs aberrantes
-ctrl_propre <- ctrl %>% filter(!au_moins_une)
+ctrl %>% filter(!anom_noyau)
 
 cat("\n Test de Wilcoxon (Sur données nettoyées) :\n")
 print(wilcox.test(taux_total ~ default_flag, data = ctrl_propre))
 
 cat("\n Test-t (Sur données nettoyées) :\n")
 print(t.test(taux_total ~ default_flag, data = ctrl_propre))
+
 
 
 ## VII. GRAPHIQUES :
@@ -592,7 +664,7 @@ p_defaut_retard <- ggplot(ctrl, aes(x = type_incoherence_defaut, fill = type_inc
 # Histogramme des dates
 p_octrois <- ggplot(ctrl, aes(x = date_octroi)) +
   geom_histogram(binwidth = 30, fill = "#43d95c", color = "black") + # Regroupe les dates par périodes de 30 jours
-  geom_vline(xintercept = as.numeric(c(debut_prod, fin_prod)), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = c(debut_prod, fin_prod), color = "red", linetype = "dashed") +
   # Marque la fenêtre légale avec deux lignes verticales rouges
   labs(title = "Distribution des dates d'octroi",
        subtitle = "En rouge : période réglementaire attendue (2020-2022)",
@@ -642,7 +714,7 @@ print(p_age)
 print(p_revenu_brut) # Pour bien voir les outliers
 print(p_revenu_zoom) # Comprendre à quoi ressemble nos vraies données
 print(p_top_anomalies)
-print(p_nb_anomalies) # On voit bien que généralement on en a pas mais que il peut y en avoir entre 1 et 10 par contrat
+print(p_nb_anomalies) # On voit bien que généralement on en a pas mais que il peut y en avoir entre 0 et 9 par contrat
 print(p_apport_prix) # Différence entre apport et le prix du véhicule
 print(p_defaut_retard)
 print(p_octrois) # On s'assure que les dates vont être là où l'on veut

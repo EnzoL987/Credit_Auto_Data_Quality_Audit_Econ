@@ -15,6 +15,7 @@
 "flag_COH_sans_emploi_avec_anciennete",24899,3.1
 "flag_COH_type_vs_marque",0,0
 "flag_COM_valeur_manquante",0,0
+"flag_COM_valeur_sentinelle_9999",780,0.1
 "flag_PLA_occasion_km_inf_1000",4594,0.57
 "flag_PLA_occasion_km_par_an_sup_30000",1584,0.2
 "flag_PLA_pret_sup_140000",14,0
@@ -28,9 +29,9 @@
 "flag_TMP_anciennete_vs_dates",15032,1.87
 "flag_TMP_debut_emploi_apres_arrete",71,0.01
 "flag_TMP_debut_emploi_apres_octroi",4755,0.59
-"flag_TMP_debut_emploi_avant_15_ans",4572,0.57
-"flag_TMP_dpd_sup_730",780,0.1
-"flag_TMP_dpd_sup_jours_ecoules",780,0.1
+"flag_TMP_debut_emploi_avant_16_ans",4683,0.58
+"flag_TMP_dpd_sup_730",0,0
+"flag_TMP_dpd_sup_jours_ecoules",0,0
 "flag_TMP_format_date",0,0
 "flag_TMP_octroi_hors_periode",0,0
 "flag_UNI_ligne_identique",3208,0.4
@@ -40,7 +41,6 @@
 "flag_VAL_anciennete_hors_0_45",0,0
 "flag_VAL_apport_negatif",0,0
 "flag_VAL_default_flag_hors_0_1",0,0
-"flag_VAL_dpd_9999",780,0.1
 "flag_VAL_dpd_negatif",1629,0.2
 "flag_VAL_duree_hors_liste",0,0
 "flag_VAL_endettement_hors_0_60",9935,1.24
