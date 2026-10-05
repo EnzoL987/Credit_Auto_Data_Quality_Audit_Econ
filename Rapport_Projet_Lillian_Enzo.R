@@ -389,11 +389,9 @@ print(table(format(ctrl$date_octroi, "%Y")))
 
 #  Qu'est-ce qu'il se passe si on ne tient pas compte de ces problemes ?
 
-# On separe les anomalies "données" (COM, UNI, VAL, COH, PLA, TMP) de la
-# solvabilité (SOLV), qui relève du risque du dossier et non d'une erreur de saisie
+# On met un peu plus beau en enlevant le flag_ du nom de chaque variable
 flags_donnees <- ctrl %>%
-  select(starts_with("flag_")) %>%
-  select(-starts_with("flag_SOLV"))
+  select(starts_with("flag_")) 
 
 ctrl$nb_anomalies <- rowSums(flags_donnees, na.rm = TRUE)
 ctrl$au_moins_une <- ctrl$nb_anomalies > 0
@@ -626,8 +624,8 @@ p_km_age <- bind_rows(df_km_anom, df_km_conf) %>%
   geom_abline(slope = 30000, intercept = 0, color = "red", linetype = "dashed") +
   geom_hline(yintercept = 1000, color = "red", linetype = "dashed") +
   coord_cartesian(ylim = c(0, 400000)) +
-  scale_color_manual(values = c("Conforme (échantillon 1 %)" = "#2f64b5",
-                                "< 1 000 km" = "#cdb8f2", "> 30 000 km/an" = "#43d95c")) +
+  scale_color_manual(values = c("Conforme (échantillon 1 %)" = "#cdb8f2",
+                                "< 1 000 km" = "#2f64b5", "> 30 000 km/an" = "#e62e56")) +
   labs(title = "Kilométrage des véhicules d'occasion selon leur âge",
        subtitle = "Lignes rouges : seuils de 1 000 km et de 30 000 km/an",
        x = "Âge du véhicule (années)", y = "Kilométrage (km)", color = "Statut")
