@@ -22,10 +22,6 @@
 "flag_PLA_prix_extreme_sup_300000",992,0.12
 "flag_PLA_revenu_aberrant",4006,0.5
 "flag_PLA_sans_emploi_revenu_sup_5000",1285,0.16
-"flag_SOLV_charges_sup_100_du_revenu",41456,5.16
-"flag_SOLV_endettement_total_sup_60",171015,21.29
-"flag_SOLV_mensualite_sup_revenu",24806,3.09
-"flag_SOLV_prix_sup_3_ans_de_revenu",27279,3.4
 "flag_TMP_anciennete_vs_dates",15032,1.87
 "flag_TMP_debut_emploi_apres_arrete",71,0.01
 "flag_TMP_debut_emploi_apres_octroi",4755,0.59
@@ -56,6 +52,5 @@
 "flag_VAL_pays_hors_liste",0,0
 "flag_VAL_prix_hors_4000_140000",2008,0.25
 "flag_VAL_revenu_hors_750_15000",6349,0.79
-"flag_VAL_revenu_hors_dico_mais_plausible",2343,0.29
 "flag_VAL_score_hors_300_850",0,0
 "flag_VAL_taux_hors_1_5_15",7621,0.95

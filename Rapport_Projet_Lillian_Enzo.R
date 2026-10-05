@@ -178,10 +178,6 @@ ctrl <- d %>%
                                loan_amount * taux_mensuel / (1 - (1 + taux_mensuel)^(-loan_term_months)),
                                NA_real_),
     km_par_an = ifelse(vehicle_age_years > 0, vehicle_mileage_km / vehicle_age_years, NA),
-    # Taux d'effort du nouveau pret (% du revenu) ; NA si revenu <= 0 (division impossible)
-    taux_effort = ifelse(monthly_net_income > 0, 100 * monthly_installment / monthly_net_income, NA),
-    # Taux d'endettement total = dette existante + nouvelle mensualite
-    taux_total= existing_debt_ratio + taux_effort,
     
     
     ## 1. COMPLETUDE :
@@ -211,8 +207,6 @@ ctrl <- d %>%
     flag_VAL_pays_hors_liste = !country %in% pays_autorises,
     flag_VAL_anciennete_hors_0_45 = job_seniority_years < 0 | job_seniority_years > 45,
     flag_VAL_revenu_hors_750_15000 = monthly_net_income < 750 | monthly_net_income > 15000,
-    flag_VAL_revenu_hors_dico_mais_plausible = (monthly_net_income < 750 & monthly_net_income > 0) | 
-      (monthly_net_income > 15000 & monthly_net_income <= 50000),
     flag_VAL_endettement_hors_0_60 = existing_debt_ratio < 0 | existing_debt_ratio > 60,
     flag_VAL_score_hors_300_850 = credit_bureau_score < 300 | credit_bureau_score > 850,
     flag_VAL_nb_prets_hors_0_6  = nb_previous_loans < 0 | nb_previous_loans > 6,
@@ -269,15 +263,6 @@ ctrl <- d %>%
     flag_PLA_pret_sup_140000 = loan_amount > 140000,   
     flag_PLA_occasion_km_par_an_sup_30000 = vehicle_condition == "Occasion" & vehicle_age_years > 0 & km_par_an > 30000,
     flag_PLA_occasion_km_inf_1000 = vehicle_condition == "Occasion" & vehicle_age_years > 0 & vehicle_mileage_km < 1000,
-    
-    
-    ## 6. SOLVABILITE :
-    
-    
-    flag_SOLV_mensualite_sup_revenu = monthly_installment > monthly_net_income,
-    flag_SOLV_endettement_total_sup_60 = ifelse(is.na(taux_total), NA, taux_total > 60),
-    flag_SOLV_charges_sup_100_du_revenu = !is.na(taux_total) & taux_total >= 100,
-    flag_SOLV_prix_sup_3_ans_de_revenu = vehicle_price > 36 * monthly_net_income,
     
     
     ## 7. FRAICHEUR / COHERENCE TEMPORELLE :
@@ -388,14 +373,6 @@ print(ctrl %>%
         head(3))
 
 
-cat("\n Solvabilité : Mensualité supérieure au revenu (Les pires ratios) :\n")
-print(ctrl %>% 
-        filter(flag_SOLV_mensualite_sup_revenu) %>%
-        arrange(desc(monthly_installment - monthly_net_income)) %>% 
-        select(loan_id, monthly_net_income, monthly_installment, employment_status) %>% 
-        head(5))
-
-
 cat("\n VERIFICATIONS GLOBALES \n")
 
 cat(" Fenetre de performance de 24 mois complete pour tous les prets ? :",
@@ -416,7 +393,7 @@ print(table(format(ctrl$date_octroi, "%Y")))
 # solvabilité (SOLV), qui relève du risque du dossier et non d'une erreur de saisie
 flags_donnees <- ctrl %>%
   select(starts_with("flag_")) %>%
-  select(-starts_with("flag_SOLV"), -flag_VAL_revenu_hors_dico_mais_plausible)
+  select(-starts_with("flag_SOLV"))
 
 ctrl$nb_anomalies <- rowSums(flags_donnees, na.rm = TRUE)
 ctrl$au_moins_une <- ctrl$nb_anomalies > 0
@@ -444,9 +421,10 @@ ctrl$anom_statut <- rowSums(fl_statut, na.rm = TRUE) > 0
 print(ctrl %>% group_by(anom_dpd, anom_statut) %>%
         summarise(nb = n(), taux_defaut_pct = round(100 * mean(default_flag), 2), .groups = "drop"))
 
-# Ce croisement démontre que les anomalies sur les retards font bondir le taux de défaut de 6,38 % à 45 %, 
-# prouvant que la corruption de la variable cible fausse directement la mesure du risque, tandis que les incohérences de statut reflètent
-# une sinistralité légèrement accrue (7,92 %).
+# Ce croisement est largement mécanique : COH_dpd_ge90_mais_sain impose default_flag == 0
+# et COH_defaut_mais_dpd_lt90 impose default_flag == 1 par construction. Le taux de 45 %
+# reflète donc surtout le poids relatif des deux sous-groupes (8 354 vs 8 036), pas un
+# signal indépendant. C'est précisément pour cette raison que anom_noyau exclut ces flags.
 
 
 
@@ -525,41 +503,6 @@ cat("% de dossiers anormaux touchant >= 2 dimensions :", round(100 * mean(ctrl$n
 cat("Embauche après octroi ET conflit d'ancienneté :", sum(ctrl$flag_TMP_debut_emploi_apres_octroi & ctrl$flag_TMP_anciennete_vs_dates), "\n")
 
 
-# Ici on rajoute des Tests statistiques afin de souligner l'importance de ces changements avant l'inspection
-
-
-cat("\n TESTS STATISTIQUES DE SOLVABILITE \n")
-
-# 1. Impact de l'endettement critique (> 60%) sur le défaut
-cat("\n Taux de defaut selon le seuil critique d'endettement (> 60%) :\n")
-print(ctrl %>%
-        filter(!is.na(flag_SOLV_endettement_total_sup_60)) %>%
-        group_by(flag_SOLV_endettement_total_sup_60) %>%
-        summarise(nb = n(), taux_defaut_pct = round(100 * mean(default_flag), 2)))
-
-# Calcul du Khi2 et de la taille d'effet
-cat("\n Test du Khi2 et Taille d'effet :\n")
-
-tab_chi2 <- table(ctrl$flag_SOLV_endettement_total_sup_60, ctrl$default_flag)
-test_khi2 <- chisq.test(tab_chi2, correct = FALSE)
-
-print(test_khi2)
-
-phi <- sqrt(unname(test_khi2$statistic) / sum(tab_chi2))
-
-cat("Taille d'effet (Coefficient Phi) :", round(phi, 3), "\n")
-
-# Tests de Wilcoxon et t-test sur la base nettoyé des valeurs aberrantes
-ctrl_propre <- ctrl %>% filter(!anom_noyau)
-
-cat("\n Test de Wilcoxon (Sur données nettoyées) :\n")
-print(wilcox.test(taux_total ~ default_flag, data = ctrl_propre))
-
-cat("\n Test-t (Sur données nettoyées) :\n")
-print(t.test(taux_total ~ default_flag, data = ctrl_propre))
-
-
-
 ## VII. GRAPHIQUES :
 
 theme_set(
@@ -589,7 +532,6 @@ p_age <- ggplot(d, aes(x = borrower_age)) +
 
 p_top_anomalies <- synthese %>%
   filter(nb_lignes > 0) %>% # Conserve uniquement les contrôles ayant détecté au moins une erreur
-  filter(!str_detect(controle, "SOLV")) %>% # Exclut les règles de solvabilité pour se concentrer sur la pure qualité des données
   slice_max(pct_base, n = 10, with_ties = FALSE) %>% # Top 10
   mutate(controle = str_remove(controle, "^flag_")) %>% # On change les noms pour un plus beau tableau
   ggplot(aes(x = reorder(controle, pct_base), y = pct_base)) + # Définit les axes et arrange par fréquence
@@ -643,23 +585,6 @@ p_octrois <- ggplot(ctrl, aes(x = date_octroi)) +
   labs(title = "Distribution des dates d'octroi",
        subtitle = "En rouge : période réglementaire attendue (2020-2022)",
        x = "Date d'octroi", y = "Nombre de contrats") 
-
-
-# On va démontrer le décrochage du risque de défaut à partir de 60% d'endettement total.
-taux_ref <- 100 * mean(ctrl$default_flag[!ctrl$flag_SOLV_endettement_total_sup_60], na.rm = TRUE)
-
-p_endettement_defaut <- ctrl %>%
-  filter(!is.na(taux_total) & taux_total <= 100) %>%
-  mutate(tranche_endettement = cut(taux_total, breaks = seq(0, 100, by = 10))) %>% # On coupe en tranche de 10%
-  group_by(tranche_endettement) %>%
-  summarise(taux_defaut_pct = round(100 * mean(default_flag), 2)) %>%
-  filter(!is.na(tranche_endettement)) %>%
-  ggplot(aes(x = tranche_endettement, y = taux_defaut_pct)) +
-  geom_col(fill = "#2f64b5", color = "black") +   # Ligne rouge horizontale calculée via taux_ref pour marquer le décrochage
-  geom_hline(yintercept = taux_ref, color = "red", linetype = "dashed") +
-  labs(title = "Taux de défaut selon la tranche d'endettement total",
-       subtitle = "Ligne rouge : taux moyen hors surendettement",
-       x = "Tranche d'endettement (%)", y = "% de défaut")
 
 
 # Sous-échantillonnage des dossiers sains (1 %) pour lisibilité
@@ -717,7 +642,6 @@ print(p_top_anomalies)
 print(p_apport_prix) # Différence entre apport et le prix du véhicule
 print(p_defaut_retard)
 print(p_octrois) # On s'assure que les dates vont être là où l'on veut
-print(p_endettement_defaut) # Plus on est endetté plus on va être enclin à avoir des défauts de payement
 print(p_coherence_anciennete)
 print(p_km_age)
 
