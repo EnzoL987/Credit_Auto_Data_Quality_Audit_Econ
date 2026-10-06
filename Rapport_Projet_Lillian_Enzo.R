@@ -13,7 +13,6 @@ options(scipen = 999)   # Permet d'éviter l'ecriture scientifique (1e+05) dans 
 ## 0. PARAMETRES DE L'ETUDE (issus du dictionnaire de donnees) :
 
 
-fichier    <- "credit_auto_retail_europe.csv"
 date_obs   <- as.Date("2024-12-31")   # date d'arrete des donnees
 debut_prod <- as.Date("2020-01-01")   # debut de la periode d'octroi
 fin_prod   <- as.Date("2022-12-31")   # fin de la periode d'octroi
@@ -39,9 +38,7 @@ marques_utilitaires <- c("Volkswagen Utilitaires", "Opel Professional",
 
 ## I. IMPORT ET APERCU DE LA BASE :
 
-
-# fileEncoding = "UTF-8" pour bien lire les accents (Célibataire, Citroën...)
-d <- read.csv(fichier, stringsAsFactors = FALSE, fileEncoding = "UTF-8")
+d <- read_csv("credit_auto_retail_europe.csv")
 dim_originale <- dim(d)
 
 
@@ -64,7 +61,7 @@ cat("\n VALEURS MANQUANTES PAR COLONNE \n")
 print(colSums(is.na(d)))
 
 cat("\n Chaines vides / espaces par colonne :\n")
-print(sapply(d, function(x) sum(x == "" | x == " ", na.rm = TRUE)))
+print(sapply(d %>% select(where(is.character)), function(x) sum(x == "" | x == " ", na.rm = TRUE)))
 # Pas de NA mais probablement des valeurs sentinelles qui remplacent chaque valeur manquante
 
 
@@ -169,9 +166,9 @@ ctrl <- d %>%
     
     # 0. Calcule des valeurs intermédiaires sans modifier les colonnes d'origine :
     
-    date_octroi = as.Date(origination_date, format = "%Y-%m-%d"),
-    date_debut_emploi = as.Date(employment_start_date, format = "%Y-%m-%d"),
-    anciennete_dates= as.numeric(date_octroi - date_debut_emploi) / 365.25,   # en annees
+    date_octroi = origination_date,
+    date_debut_emploi = employment_start_date,
+    anciennete_dates = as.numeric(date_octroi - date_debut_emploi) / 365.25,   # en annees
     taux_mensuel = interest_rate_pct / 100 / 12,
     # Mensualite theorique (formule d'amortissement) : NA si le taux est hors domaine
     mensualite_theo = ifelse(taux_mensuel > 0,
@@ -265,12 +262,10 @@ ctrl <- d %>%
     flag_PLA_occasion_km_inf_1000 = vehicle_condition == "Occasion" & vehicle_age_years > 0 & vehicle_mileage_km < 1000,
     
     
-    ## 7. FRAICHEUR / COHERENCE TEMPORELLE :
+    ## 6. FRAICHEUR / COHERENCE TEMPORELLE :
     
     
-    flag_TMP_format_date = !grepl("^[0-9]{4}-[0-9]{2}-[0-9]{2}$", origination_date) |
-      !grepl("^[0-9]{4}-[0-9]{2}-[0-9]{2}$", employment_start_date) |
-      is.na(date_octroi) | is.na(date_debut_emploi),
+    flag_TMP_format_date = is.na(date_octroi) | is.na(date_debut_emploi),
     flag_TMP_octroi_hors_periode = date_octroi < debut_prod | date_octroi > fin_prod,
     flag_TMP_debut_emploi_apres_octroi = date_debut_emploi > date_octroi,
     flag_TMP_debut_emploi_apres_arrete = date_debut_emploi > date_obs,
@@ -389,7 +384,7 @@ print(table(format(ctrl$date_octroi, "%Y")))
 
 #  Qu'est-ce qu'il se passe si on ne tient pas compte de ces problemes ?
 
-# On met un peu plus beau en enlevant le flag_ du nom de chaque variable
+# On prend toutes les anomalies de qualité des données
 flags_donnees <- ctrl %>%
   select(starts_with("flag_")) 
 
@@ -454,6 +449,9 @@ par_dim <- colSums(mat_dim)
 print(data.frame(dimension = dims, nb = par_dim, pct = round(100 * par_dim / nrow(d), 2)))
 
 
+cat("% des dossiers anormaux avec une anomalie de cohérence :", round(100 * par_dim["COH"] / sum(ctrl$au_moins_une), 1), "\n")
+
+
 # Union pour la ligne 7 du tableau de cohérence
 cat("Montant prêt incohérent (union) :",
     sum(ctrl$flag_COH_pret_diff_prix_moins_apport | ctrl$flag_COH_ltv_incoherent), "\n")
@@ -466,7 +464,7 @@ cat("dont ancienneté > 0 :", sum(is_ret & d$job_seniority_years > 0), "\n")
 print(sapply(c(55, 60, 62), function(s) sum(is_ret & d$borrower_age < s)))
 
 
-# Part de retraités par tranche d'âge (si elle est ~constante : statut sans lien avec l'âge)
+# Part de retraités par tranche d'âge (si elle est constante : statut sans lien avec l'âge)
 diag_ret <- d %>%
   filter(borrower_age >= 18, borrower_age <= 80) %>%
   mutate(tranche_age = cut(borrower_age, breaks = c(17, 25, 35, 45, 55, 65, 80))) %>%
@@ -495,9 +493,13 @@ print(summary_statut)
 
 
 cat("Identifiants distincts :", n_distinct(d$loan_id), "| lignes en excès :", nrow(d) - n_distinct(d$loan_id), "\n")
+
 cat("Conflits de clé (même loan_id, contenu différent) :", sum(lignes_id_dupliquees & !dup_ligne), "\n")
+
 print(sapply(c(17, 18, 19, 79, 80, 81), function(a) sum(d$borrower_age == a)))   # pic à 18 ans
+
 cat("% de dossiers anormaux touchant >= 2 dimensions :", round(100 * mean(ctrl$nb_dimensions[ctrl$au_moins_une] >= 2), 1), "\n")
+
 cat("Embauche après octroi ET conflit d'ancienneté :", sum(ctrl$flag_TMP_debut_emploi_apres_octroi & ctrl$flag_TMP_anciennete_vs_dates), "\n")
 
 
