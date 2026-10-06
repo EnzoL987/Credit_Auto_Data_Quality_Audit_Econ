@@ -10,12 +10,12 @@ library(knitr)
 options(scipen = 999)   # Permet d'éviter l'ecriture scientifique (1e+05) dans les sorties
 
 
-## 0. PARAMETRES DE L'ETUDE (issus du dictionnaire de donnees) :
+## 0. PARAMETRES DE L'ETUDE (issus du dictionnaire de données) :
 
 
-date_obs   <- as.Date("2024-12-31")   # date d'arrete des donnees
-debut_prod <- as.Date("2020-01-01")   # debut de la periode d'octroi
-fin_prod   <- as.Date("2022-12-31")   # fin de la periode d'octroi
+date_obs   <- as.Date("2024-12-31")   # date d'arrêt des données
+debut_prod <- as.Date("2020-01-01")   # début de la periode d'octroi
+fin_prod   <- as.Date("2022-12-31")   # fin de la période d'octroi
 
 pays_autorises                 <- c("France", "Allemagne", "Italie", "Espagne", "Belgique",
                                     "Pays-Bas", "Portugal", "Pologne", "Autriche", "Irlande")
@@ -28,7 +28,6 @@ types_vehicule_autorises       <- c("Véhicule particulier", "Véhicule utilitai
 conditions_vehicule_autorisees <- c("Neuf", "Occasion")
 durees_autorisees              <- c(12, 24, 36, 48, 60, 72, 84)
 
-# Marques "utilitaires" (pour vérifier la coherence type de véhicule / marque)
 marques_utilitaires <- c("Volkswagen Utilitaires", "Opel Professional",
                          "Mercedes-Benz Vans", "Ford Transit", "Citroën Business",
                          "Peugeot Pro", "Fiat Professional", "Iveco", "Renault Pro+")
@@ -37,6 +36,7 @@ marques_utilitaires <- c("Volkswagen Utilitaires", "Opel Professional",
 
 
 ## I. IMPORT ET APERCU DE LA BASE :
+
 
 d <- read_csv("credit_auto_retail_europe.csv")
 dim_originale <- dim(d)
@@ -104,8 +104,8 @@ print(pic_sentinelle)
 
 
 
-# 2. Colonnes texte : modalités "vides" déguisées, et liste complète des modalités
-mots_vides <- c("", "NA", "N/A", "NULL", "?", "-", "INCONNU", "UNKNOWN", "XXX")
+#2. Colonnes texte : modalités "vides" déguisées, et liste complète des modalités
+mots_vides <- c("", "NA", "N/A", "NULL", "?", "-", "INCONNU", "UNKNOWN", "XXX", "9999")
 
 # Exclusion des variables non pertinentes pour ce test
 cols_txt <- setdiff(names(d)[sapply(d, is.character)],
@@ -143,8 +143,10 @@ dup_ligne <- duplicated(d) | duplicated(d, fromLast = TRUE)
 cat("\n UNICITE \n")
 
 cat("Lignes concernées (toutes occurrences) :", sum(lignes_id_dupliquees), "\n")
+
 cat("Lignes strictement identiques (toutes colonnes) :", sum(dup_ligne), "\n")
-# Dénombre les identifiants qui ne respectent pas le format défini pour les ids --> mauvaise saisies.
+
+# Dénombre les identifiants qui ne respectent pas le format défini pour les ids -> mauvaise saisies.
 cat("Identifiants au mauvais format (AUTO + 7 chiffres) :", sum(!grepl("^AUTO[0-9]{7}$", d$loan_id)), "\n")
 
 
@@ -155,13 +157,13 @@ cat("Identifiants au mauvais format (AUTO + 7 chiffres) :", sum(!grepl("^AUTO[0-
 
 # Un peu de vocabulaire sur ce qu'on s'apprête à faire :
 
-# ctrl = copie de d avec des colonnes de controle en plus
+# copie = copie de d avec des colonnes de controle en plus
 # flag = TRUE quand la ligne pose probleme pour le controle concerne
 # COM = completude, UNI = unicite, VAL = validite, COH = coherence inter-champs,
-# PLA = plausibilite, SOLV = solvabilite, TMP = temporel
+# PLA = plausibilite et TMP = temporel
 
 
-ctrl <- d %>%
+copie <- d %>%
   mutate(
     
     # 0. Calcule des valeurs intermédiaires sans modifier les colonnes d'origine :
@@ -190,10 +192,11 @@ ctrl <- d %>%
     flag_UNI_ligne_identique = dup_ligne,
     
     
-    ## 3. VALIDITE :
+    ## 3. VALIDITE : (Contrôle de tout le dictionnaire)
     
     
-    flag_VAL_id_format = !grepl("^AUTO[0-9]{7}$", loan_id),
+    flag_VAL_id_format = !grepl("^AUTO[0-9]{7}$", loan_id), 
+    # Dans le rapport on l'a mit dans la partie unicité car c'est un controôle sur la clé
     flag_VAL_age_hors_18_80 = borrower_age < 18 | borrower_age > 80,
     flag_VAL_genre = !borrower_gender %in% genres_autorises,
     flag_VAL_modalites_hors_dico = !marital_status %in% statuts_maritaux_autorises |
@@ -228,7 +231,7 @@ ctrl <- d %>%
     flag_COH_apport_sup_ou_egal_prix = down_payment_amount >= vehicle_price,
     flag_COH_pret_sup_prix = loan_amount > vehicle_price,
     flag_COH_ltv_incoherent = abs(loan_amount / vehicle_price - ltv_ratio) > 0.001,
-    # Mensualite vs formule d'amortissement classique (tolerance 1 %) ; NA si non calculable
+    # Mensualite vs formule d'amortissement classique (tolerance 1 %), NA si non calculable
     flag_COH_mensualite_incoherente = ifelse(!is.na(mensualite_theo),
                                                   abs(mensualite_theo - monthly_installment) / mensualite_theo > 0.01, NA),
     # Definition du defaut : >= 90 jours de retard
@@ -253,6 +256,7 @@ ctrl <- d %>%
     
     
     ## 5. EXACTITUDE / PLAUSIBILITE :
+    
     
     flag_PLA_revenu_aberrant = monthly_net_income <= 0 | monthly_net_income > 50000,
     flag_PLA_sans_emploi_revenu_sup_5000 = employment_status == "Sans emploi" & monthly_net_income > 5000,
@@ -283,7 +287,7 @@ stopifnot(identical(dim(d), dim_originale))
 # SYNTHESE CHIFFREE (nb et % de lignes touchées par contrôle) :
 
 
-flags <- ctrl %>% select(starts_with("flag_"))
+flags <- copie %>% select(starts_with("flag_"))
 nb_par_controle <- colSums(flags, na.rm = TRUE)
 
 synthese <- data.frame(
@@ -299,6 +303,7 @@ print(synthese, row.names = FALSE)
 
 # Sortie d'un .csv avec le tableau des anomalies :
 # write.csv(synthese, "synthese_anomalies.csv", row.names = FALSE)
+
 
 # Création d'un beau tableau global avec kable (l'équivalent du tableau .csv mais ici) :
 
@@ -320,7 +325,7 @@ cat("\n EXEMPLES DE LIGNES PROBLEMATIQUES \n")
 
 cat("\n Âge hors limites (18-80 ans) :\n")
 # On trie par âge croissant pour faire remonter immédiatement les cas choquants.
-print(ctrl %>% 
+print(copie %>% 
         filter(flag_VAL_age_hors_18_80) %>%
         arrange(borrower_age) %>% 
         select(loan_id, borrower_age, employment_status, loan_amount) %>% 
@@ -328,7 +333,7 @@ print(ctrl %>%
 
 
 cat("\n Retard >= 90j mais marqué sain (Les retards les plus longs) :\n")
-print(ctrl %>% 
+print(copie %>% 
         filter(flag_COH_dpd_ge90_mais_sain) %>%
         arrange(desc(days_past_due)) %>% 
         select(loan_id, days_past_due, default_flag) %>% 
@@ -336,7 +341,7 @@ print(ctrl %>%
 
 
 cat("\n Mensualité incohérente vs formule d'amortissement (Les plus grands écarts) :\n")
-print(ctrl %>% 
+print(copie %>% 
         filter(flag_COH_mensualite_incoherente) %>%
         mutate(ecart_euros = abs(monthly_installment - mensualite_theo)) %>%
         arrange(desc(ecart_euros)) %>% 
@@ -345,7 +350,7 @@ print(ctrl %>%
 
 
 cat("\n Incohérence métier : Retraités avec de l'ancienneté professionnelle :\n")
-print(ctrl %>% 
+print(copie %>% 
         filter(flag_COH_retraite_avec_anciennete) %>%
         arrange(desc(job_seniority_years)) %>% # On montre les retraités avec 40 ans d'ancienneté "en cours"
         select(loan_id, employment_status, borrower_age, job_seniority_years) %>% 
@@ -353,7 +358,7 @@ print(ctrl %>%
 
 
 cat("\n Revenus aberrants (valeurs négatives ou nulles) :\n")
-print(ctrl %>% 
+print(copie %>% 
         filter(flag_PLA_revenu_aberrant, monthly_net_income <= 0) %>%
         arrange(monthly_net_income) %>% # Du plus négatif vers 0
         select(loan_id, monthly_net_income, employment_status, loan_amount) %>% 
@@ -361,7 +366,7 @@ print(ctrl %>%
 
 
 cat("\n Revenus aberrants (valeurs extrêmes positives > 50 000 EUR) :\n")
-print(ctrl %>% 
+print(copie %>% 
         filter(flag_PLA_revenu_aberrant, monthly_net_income > 50000) %>%
         arrange(desc(monthly_net_income)) %>% # Du plus élevé au moins élevé
         select(loan_id, monthly_net_income, employment_status, loan_amount) %>% 
@@ -371,11 +376,11 @@ print(ctrl %>%
 cat("\n VERIFICATIONS GLOBALES \n")
 
 cat(" Fenetre de performance de 24 mois complete pour tous les prets ? :",
-    sum(ctrl$date_octroi + 730 > date_obs), "\n")
+    sum(copie$date_octroi + 730 > date_obs), "\n")
 
 
 cat("Repartition des octrois par annee :\n")
-print(table(format(ctrl$date_octroi, "%Y")))
+print(table(format(copie$date_octroi, "%Y")))
 
 
 
@@ -385,11 +390,11 @@ print(table(format(ctrl$date_octroi, "%Y")))
 #  Qu'est-ce qu'il se passe si on ne tient pas compte de ces problemes ?
 
 # On prend toutes les anomalies de qualité des données
-flags_donnees <- ctrl %>%
+flags_donnees <- copie %>%
   select(starts_with("flag_")) 
 
-ctrl$nb_anomalies <- rowSums(flags_donnees, na.rm = TRUE)
-ctrl$au_moins_une <- ctrl$nb_anomalies > 0
+copie$nb_anomalies <- rowSums(flags_donnees, na.rm = TRUE)
+copie$au_moins_une <- copie$nb_anomalies > 0
 
 
 # Noyau d'anomalies de saisie : on retire les flags de statut pro (structurels, touchent presque
@@ -400,24 +405,24 @@ fl_sans_statut <- flags_donnees %>%
 cat("% >= 1 anomalie hors contrôles de statut :", round(100 * mean(rowSums(fl_sans_statut, na.rm = TRUE) > 0), 2), "\n")
 
 fl_noyau <- fl_sans_statut %>% select(-matches("dpd|default|defaut|9999"))
-ctrl$anom_noyau <- rowSums(fl_noyau, na.rm = TRUE) > 0
-print(ctrl %>% group_by(anom_noyau) %>% summarise(nb = n(), taux_defaut_pct = round(100 * mean(default_flag), 2)))
+copie$anom_noyau <- rowSums(fl_noyau, na.rm = TRUE) > 0
+print(copie %>% group_by(anom_noyau) %>% summarise(nb = n(), taux_defaut_pct = round(100 * mean(default_flag), 2)))
 
 
-# qui explique l'écart brut ?
+# Comment expliquer l'écart brut ?
 fl_dpd    <- flags_donnees %>% select(matches("dpd|default|defaut|9999"))
 fl_statut <- flags_donnees %>% select(flag_COH_retraite_avec_anciennete,
                                       flag_COH_retraite_moins_de_55_ans,
                                       flag_COH_sans_emploi_avec_anciennete)
-ctrl$anom_dpd    <- rowSums(fl_dpd,    na.rm = TRUE) > 0
-ctrl$anom_statut <- rowSums(fl_statut, na.rm = TRUE) > 0
-print(ctrl %>% group_by(anom_dpd, anom_statut) %>%
+copie$anom_dpd    <- rowSums(fl_dpd,    na.rm = TRUE) > 0
+copie$anom_statut <- rowSums(fl_statut, na.rm = TRUE) > 0
+print(copie %>% group_by(anom_dpd, anom_statut) %>%
         summarise(nb = n(), taux_defaut_pct = round(100 * mean(default_flag), 2), .groups = "drop"))
 
-# Ce croisement est largement mécanique : COH_dpd_ge90_mais_sain impose default_flag == 0
-# et COH_defaut_mais_dpd_lt90 impose default_flag == 1 par construction. Le taux de 45 %
-# reflète donc surtout le poids relatif des deux sous-groupes (8 354 vs 8 036), pas un
-# signal indépendant. C'est précisément pour cette raison que anom_noyau exclut ces flags.
+# Ce croisement est mécanique : COH_dpd_ge90_mais_sain impose default_flag == 0
+# et COH_defaut_mais_dpd_lt90 impose default_flag == 1 par construction. 
+# Le taux de 45 % reflète donc surtout le poids relatif des deux sous-groupes (8 354 vs 8 036), pas un
+# signal indépendant. C'est donc pour cette raison que anom_noyau exclut ces flags.
 
 
 
@@ -425,16 +430,16 @@ cat("\n IMPACT DES ANOMALIES \n")
 
 
 cat("\nTaux de defaut selon la presence d'une anomalie de donnee :\n")
-print(ctrl %>% group_by(au_moins_une) %>%
+print(copie %>% group_by(au_moins_une) %>%
         summarise(nb = n(), taux_defaut_pct = round(100 * mean(default_flag), 2)))
 
 
 
-# nb_anomalies compte des FLAGS, pas des erreurs distinctes (une même erreur
-# peut déclencher plusieurs flags). Ne pas le lire comme un nombre d'erreurs indépendantes.
+# nb_anomalies compte des FLAGS, pas des erreurs distinctes (une même erreur peut déclencher plusieurs flags). 
 
-cat("Véhicule état/âge/km (union) :", sum(ctrl$flag_COH_neuf_avec_age_positif | ctrl$flag_COH_neuf_km_sup_100 | ctrl$flag_COH_occasion_age_zero), "\n")
-cat("Valeurs négatives (union) :", sum(ctrl$flag_VAL_dpd_negatif | ctrl$flag_VAL_mensualite_negative | ctrl$flag_VAL_km_negatif), "\n")
+cat("Véhicule état/âge/km (union) :", sum(copie$flag_COH_neuf_avec_age_positif | copie$flag_COH_neuf_km_sup_100 | copie$flag_COH_occasion_age_zero), "\n")
+cat("Valeurs négatives (union) :", sum(copie$flag_VAL_dpd_negatif | copie$flag_VAL_mensualite_negative | copie$flag_VAL_km_negatif), "\n")
+
 
 # Tableau de synthèse par dimension (lignes distinctes)
 dims <- c("COM","UNI","VAL","COH","PLA","TMP")
@@ -443,19 +448,17 @@ mat_dim <- sapply(dims, function(p) {
   rowSums(flags_donnees[, cols, drop = FALSE], na.rm = TRUE) > 0
 })
 
-ctrl$nb_dimensions <- rowSums(mat_dim)
+copie$nb_dimensions <- rowSums(mat_dim)
 
 par_dim <- colSums(mat_dim)
 print(data.frame(dimension = dims, nb = par_dim, pct = round(100 * par_dim / nrow(d), 2)))
 
 
-cat("% des dossiers anormaux avec une anomalie de cohérence :", round(100 * par_dim["COH"] / sum(ctrl$au_moins_une), 1), "\n")
+cat("% des dossiers anormaux avec une anomalie de cohérence :", round(100 * par_dim["COH"] / sum(copie$au_moins_une), 1), "\n")
 
 
-# Union pour la ligne 7 du tableau de cohérence
-cat("Montant prêt incohérent (union) :",
-    sum(ctrl$flag_COH_pret_diff_prix_moins_apport | ctrl$flag_COH_ltv_incoherent), "\n")
-
+cat("Montant prêt incohérent :",
+    sum(copie$flag_COH_pret_diff_prix_moins_apport | copie$flag_COH_ltv_incoherent), "\n")
 
 
 is_ret <- d$employment_status == "Retraité"
@@ -472,6 +475,7 @@ diag_ret <- d %>%
   summarise(nb = n(),
             pct_retraites = round(100 * mean(employment_status == "Retraité"), 1))
 print(diag_ret)
+
 
 # Ancienneté déclarée : retraités vs autres statuts
 retraite_vs_statut <- d %>% group_by(retraite = employment_status == "Retraité") %>%
@@ -498,20 +502,21 @@ cat("Conflits de clé (même loan_id, contenu différent) :", sum(lignes_id_dupl
 
 print(sapply(c(17, 18, 19, 79, 80, 81), function(a) sum(d$borrower_age == a)))   # pic à 18 ans
 
-cat("% de dossiers anormaux touchant >= 2 dimensions :", round(100 * mean(ctrl$nb_dimensions[ctrl$au_moins_une] >= 2), 1), "\n")
+cat("% de dossiers anormaux touchant >= 2 dimensions :", round(100 * mean(copie$nb_dimensions[copie$au_moins_une] >= 2), 1), "\n")
 
-cat("Embauche après octroi ET conflit d'ancienneté :", sum(ctrl$flag_TMP_debut_emploi_apres_octroi & ctrl$flag_TMP_anciennete_vs_dates), "\n")
+cat("Embauche après octroi ET conflit d'ancienneté :", sum(copie$flag_TMP_debut_emploi_apres_octroi & copie$flag_TMP_anciennete_vs_dates), "\n")
 
 
 ## VII. GRAPHIQUES :
+
 
 theme_set(
   theme_minimal(base_size = 11) +
     theme(
       plot.title = element_text(face = "bold", color = "#1a252f", size = 13), # Titre bleu-noir
       plot.subtitle = element_text(color = "gray40", size = 10),
-      panel.grid.minor = element_blank(), # Supprime le quadrillage secondaire inutile
-      panel.grid.major.x = element_blank(), # Enlève les lignes verticales (inutiles sur des barplots)
+      panel.grid.minor = element_blank(), # Supprime le quadrillage secondaire
+      panel.grid.major.x = element_blank(), # Enlève les lignes verticales 
       legend.position = "bottom"
     )
 )
@@ -549,6 +554,7 @@ df_anomalies_apport <- d %>% filter(down_payment_amount >= vehicle_price)
 set.seed(123) 
 df_conformes_sample <- d %>% filter(down_payment_amount < vehicle_price) %>% sample_frac(0.01)
 
+
 # Nuage de points comparant Apport vs Prix
 p_apport_prix <- bind_rows(df_anomalies_apport, df_conformes_sample) %>% # On rassemble les 2
   ggplot(aes(x = vehicle_price, y = down_payment_amount,
@@ -563,8 +569,9 @@ p_apport_prix <- bind_rows(df_anomalies_apport, df_conformes_sample) %>% # On ra
        x = "Prix du véhicule", y = "Apport initial", color = "Statut") +
   theme(legend.position = "bottom")
 
+
 # Plusieurs barplots sur les incohérences de définition de défaut
-p_defaut_retard <- ggplot(ctrl, aes(x = type_incoherence_defaut, fill = type_incoherence_defaut)) +
+p_defaut_retard <- ggplot(copie, aes(x = type_incoherence_defaut, fill = type_incoherence_defaut)) +
   geom_bar(color = "black", show.legend = FALSE) +
   scale_fill_manual(values = c("Conforme" = "#43d95c", 
                                "Sous-estimation (retard >= 90j, non marqué en défaut)" = "#cdb8f2", 
@@ -578,7 +585,7 @@ p_defaut_retard <- ggplot(ctrl, aes(x = type_incoherence_defaut, fill = type_inc
 
 
 # Histogramme des dates
-p_octrois <- ggplot(ctrl, aes(x = date_octroi)) +
+p_octrois <- ggplot(copie, aes(x = date_octroi)) +
   geom_histogram(binwidth = 30, fill = "#43d95c", color = "black") + # Regroupe les dates par périodes de 30 jours
   geom_vline(xintercept = c(debut_prod, fin_prod), color = "red", linetype = "dashed") +
   # Marque la fenêtre légale avec deux lignes verticales rouges
@@ -588,9 +595,10 @@ p_octrois <- ggplot(ctrl, aes(x = date_octroi)) +
 
 
 # Sous-échantillonnage des dossiers sains (1 %) pour lisibilité
-df_tmp_anomalies <- ctrl %>% filter(flag_TMP_anciennete_vs_dates == TRUE)
+df_tmp_anomalies <- copie %>% filter(flag_TMP_anciennete_vs_dates == TRUE)
 set.seed(123)
-df_tmp_conformes <- ctrl %>% filter(flag_TMP_anciennete_vs_dates == FALSE) %>% sample_frac(0.01)
+df_tmp_conformes <- copie %>% filter(flag_TMP_anciennete_vs_dates == FALSE) %>% sample_frac(0.01)
+
 
 p_coherence_anciennete <- bind_rows(df_tmp_anomalies, df_tmp_conformes) %>%
   ggplot(aes(x = job_seniority_years, y = anciennete_dates, 
@@ -607,14 +615,15 @@ p_coherence_anciennete <- bind_rows(df_tmp_anomalies, df_tmp_conformes) %>%
        color = "Statut")
 
 
-df_km_anom <- ctrl %>%
+df_km_anom <- copie %>%
   filter(flag_PLA_occasion_km_inf_1000 | flag_PLA_occasion_km_par_an_sup_30000,
          vehicle_mileage_km >= 0)
 set.seed(123)
-df_km_conf <- ctrl %>%
+df_km_conf <- copie %>%
   filter(vehicle_condition == "Occasion", vehicle_age_years > 0, vehicle_mileage_km >= 0,
          !flag_PLA_occasion_km_inf_1000, !flag_PLA_occasion_km_par_an_sup_30000) %>%
   sample_frac(0.01)
+
 
 p_km_age <- bind_rows(df_km_anom, df_km_conf) %>%
   mutate(statut_km = case_when(
@@ -637,13 +646,13 @@ p_km_age <- bind_rows(df_km_anom, df_km_conf) %>%
 
 # Sorties des graphiques :
 
-print(p_age)
-print(p_top_anomalies)
-print(p_apport_prix) # Différence entre apport et le prix du véhicule
-print(p_defaut_retard)
-print(p_octrois) # On s'assure que les dates vont être là où l'on veut
-print(p_coherence_anciennete)
-print(p_km_age)
+print(p_age) # Distribution de l'âge des emprunteurs 
+print(p_top_anomalies) # Classement des 10 erreurs de saisie les plus fréquentes
+print(p_apport_prix) # Met en évidence les anomalies où l'apport initial dépasse le prix du véhicule
+print(p_defaut_retard) # Pointe les décalages entre le statut de défaut déclaré et les jours de retard réels
+print(p_octrois) # Vérifie visuellement que les prêts se concentrent bien sur la période attendue (2020-2022)
+print(p_coherence_anciennete) # Repère les contradictions mathématiques entre l'ancienneté déclarée et la date d'embauche
+print(p_km_age) # Identifie les usages irréalistes sur les occasions
 
 
 
