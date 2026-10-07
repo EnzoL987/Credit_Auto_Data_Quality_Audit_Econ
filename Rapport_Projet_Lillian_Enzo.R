@@ -38,6 +38,7 @@ marques_utilitaires <- c("Volkswagen Utilitaires", "Opel Professional",
 ## I. IMPORT ET APERCU DE LA BASE :
 
 
+# Le fichier credit_auto_retail_europe.csv doit être dans le répertoire de travail
 d <- read_csv("credit_auto_retail_europe.csv")
 dim_originale <- dim(d)
 
@@ -108,8 +109,7 @@ print(pic_sentinelle)
 mots_vides <- c("", "NA", "N/A", "NULL", "?", "-", "INCONNU", "UNKNOWN", "XXX", "9999")
 
 # Exclusion des variables non pertinentes pour ce test
-cols_txt <- setdiff(names(d)[sapply(d, is.character)],
-                    c("loan_id", "origination_date", "employment_start_date"))
+cols_txt <- setdiff(names(d)[sapply(d, is.character)], "loan_id")
 
 scan_txt <- map_dfr(cols_txt, function(col) {
   d %>%
@@ -397,8 +397,7 @@ copie$nb_anomalies <- rowSums(flags_donnees, na.rm = TRUE)
 copie$au_moins_une <- copie$nb_anomalies > 0
 
 
-# Noyau d'anomalies de saisie : on retire les flags de statut pro (structurels, touchent presque
-# toute une modalité) et les flags construits à partir du défaut/DPD (circularité)
+# Hors contrôles de statut pro (structurels : ils touchent presque toute une modalité)
 fl_sans_statut <- flags_donnees %>%
   select(-flag_COH_retraite_avec_anciennete, -flag_COH_retraite_moins_de_55_ans,
          -flag_COH_sans_emploi_avec_anciennete)
@@ -475,8 +474,11 @@ age_filter <- d %>% filter(borrower_age >= 18, borrower_age <= 80) %>%
 print(age_filter)
 
 
+# Complément descriptif, non repris dans le rapport
 summary_statut <- d %>% group_by(employment_status) %>% summarise(nb = n(), taux_defaut_pct = round(100 * mean(default_flag), 2))
 print(summary_statut)
+# Cependant, on remarque que proportionnellement les profils abordant le statut "Sans emploi" 
+# sont plus particulièrement associés aux défauts.
 
 
 cat("Identifiants distincts :", n_distinct(d$loan_id), "| lignes en excès :", nrow(d) - n_distinct(d$loan_id), "\n")
