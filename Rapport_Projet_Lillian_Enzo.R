@@ -196,7 +196,7 @@ copie <- d %>%
     
     
     flag_VAL_id_format = !grepl("^AUTO[0-9]{7}$", loan_id), 
-    # Dans le rapport on l'a mit dans la partie unicité car c'est un controôle sur la clé
+    # Dans le rapport on l'a mis dans la partie unicité car c'est un controôle sur la clé
     flag_VAL_age_hors_18_80 = borrower_age < 18 | borrower_age > 80,
     flag_VAL_genre = !borrower_gender %in% genres_autorises,
     flag_VAL_modalites_hors_dico = !marital_status %in% statuts_maritaux_autorises |
@@ -404,26 +404,6 @@ fl_sans_statut <- flags_donnees %>%
          -flag_COH_sans_emploi_avec_anciennete)
 cat("% >= 1 anomalie hors contrôles de statut :", round(100 * mean(rowSums(fl_sans_statut, na.rm = TRUE) > 0), 2), "\n")
 
-fl_noyau <- fl_sans_statut %>% select(-matches("dpd|default|defaut|9999"))
-copie$anom_noyau <- rowSums(fl_noyau, na.rm = TRUE) > 0
-print(copie %>% group_by(anom_noyau) %>% summarise(nb = n(), taux_defaut_pct = round(100 * mean(default_flag), 2)))
-
-
-# Comment expliquer l'écart brut ?
-fl_dpd    <- flags_donnees %>% select(matches("dpd|default|defaut|9999"))
-fl_statut <- flags_donnees %>% select(flag_COH_retraite_avec_anciennete,
-                                      flag_COH_retraite_moins_de_55_ans,
-                                      flag_COH_sans_emploi_avec_anciennete)
-copie$anom_dpd    <- rowSums(fl_dpd,    na.rm = TRUE) > 0
-copie$anom_statut <- rowSums(fl_statut, na.rm = TRUE) > 0
-print(copie %>% group_by(anom_dpd, anom_statut) %>%
-        summarise(nb = n(), taux_defaut_pct = round(100 * mean(default_flag), 2), .groups = "drop"))
-
-# Ce croisement est mécanique : COH_dpd_ge90_mais_sain impose default_flag == 0
-# et COH_defaut_mais_dpd_lt90 impose default_flag == 1 par construction. 
-# Le taux de 45 % reflète donc surtout le poids relatif des deux sous-groupes (8 354 vs 8 036), pas un
-# signal indépendant. C'est donc pour cette raison que anom_noyau exclut ces flags.
-
 
 
 cat("\n IMPACT DES ANOMALIES \n")
@@ -433,6 +413,9 @@ cat("\nTaux de defaut selon la presence d'une anomalie de donnee :\n")
 print(copie %>% group_by(au_moins_une) %>%
         summarise(nb = n(), taux_defaut_pct = round(100 * mean(default_flag), 2)))
 
+
+cat("Bilan global :", sum(copie$au_moins_une), "dossiers, soit",
+    round(100 * mean(copie$au_moins_une), 2), "% de la base\n")
 
 
 # nb_anomalies compte des FLAGS, pas des erreurs distinctes (une même erreur peut déclencher plusieurs flags). 
@@ -499,6 +482,18 @@ print(summary_statut)
 cat("Identifiants distincts :", n_distinct(d$loan_id), "| lignes en excès :", nrow(d) - n_distinct(d$loan_id), "\n")
 
 cat("Conflits de clé (même loan_id, contenu différent) :", sum(lignes_id_dupliquees & !dup_ligne), "\n")
+
+
+inc_defaut <- copie$flag_COH_dpd_ge90_mais_sain | copie$flag_COH_defaut_mais_dpd_lt90
+cat("Incohérences défaut/DPD :", sum(inc_defaut), "\n")
+cat("dont loan_id dupliqué :", sum(inc_defaut & lignes_id_dupliquees),
+    "(", round(100 * sum(inc_defaut & lignes_id_dupliquees) / sum(inc_defaut), 2), "%)\n")
+
+# Vérification ponctuelle
+ex5 <- c("AUTO0550150", "AUTO0094415", "AUTO0321974")
+print(d %>% filter(loan_id %in% ex5) %>%
+        select(loan_id, monthly_net_income, days_past_due, default_flag) %>% arrange(loan_id))
+
 
 print(sapply(c(17, 18, 19, 79, 80, 81), function(a) sum(d$borrower_age == a)))   # pic à 18 ans
 
