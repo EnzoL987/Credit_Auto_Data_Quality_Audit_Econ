@@ -376,7 +376,8 @@ tableau_synthese <- synthese %>%
 
 print(tableau_synthese)
 
-
+sum(copie$flag_COH_mensualite_incoherente & copie$flag_COH_pret_diff_prix_moins_apport, na.rm = TRUE)
+sum(copie$flag_COH_mensualite_incoherente & copie$flag_VAL_taux_hors_1_5_15, na.rm = TRUE)
 
 ## V. EXEMPLES DE LIGNES PROBLEMATIQUES (Sélection des pires cas) :
 
