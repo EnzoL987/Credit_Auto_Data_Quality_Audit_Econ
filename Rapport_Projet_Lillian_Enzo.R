@@ -15,10 +15,22 @@ options(scipen = 999) # Permet d'éviter l'ecriture scientifique (1e+05) dans le
 
 # A. IMPORT :
 
+# Importation du fichier .csv
 d <- read_csv("credit_auto_retail_europe.csv")
+
+# Sauvegarde des dimensions 
 dim_originale <- dim(d)
 
+# Affichage clair du nombre de lignes et de colonnes
 cat("Lignes :", nrow(d), "| Colonnes :", ncol(d), "\n\n")
+
+
+# Affichage de la structure des données 
+str(d)
+
+
+# Génération et affichage d'un résumé statistique (min, max, moyenne, NA) pour chaque colonne
+print(summary(d))
 
 
 # B. JUSTIFICATION DES PARAMÈTRES (Analyse de sensibilité) :
@@ -49,15 +61,17 @@ sens_emploi <- map_dfr(c(3000, 5000, 8000), function(s)
 
 # Bilan de la sensibilité
 sensibilite <- bind_rows(sens_retraite, sens_km, sens_emploi) %>%
-  mutate(pct_base = round(100 * nb / nrow(d), 2))
+  mutate(pct_base = round(100 * nb / nrow(d), 2), 
+         pct_retraites = ifelse(controle == "Retraités < seuil d'âge", round(100 * nb / sum(is_ret), 1), NA))
 
 cat("\nANALYSE DE SENSIBILITE DES SEUILS \n")
+
 print(as_tibble(sensibilite))
 
-# INTERPRETATION DES RESULTATS :
-# - Retraite = pente douce (8,2 % à 9,2 % de la base) -> on prend 55 ans par sécurité.
-# - Km/an = falaise (cassure) entre 20k et 30k -> on retient 30 000 km/an.
-# - Sans emploi = plateau entre 3k et 8k -> le seuil de 5 000 EUR est bon pour nous.
+# Interprétation des résultats :
+# Retraite = pente douce (8,2 % a 9,25 % de la base) on garde le 55 par sécurité, 
+# km/an = falaise entre 20k et 30k, sans emploi = plateau de 3k a 8k -> les seuils retenus sont robustes.
+
 
 
 # C. PARAMETRES DE L'ETUDE :
@@ -81,7 +95,7 @@ marques_utilitaires <- c("Volkswagen Utilitaires", "Opel Professional",
                          "Mercedes-Benz Vans", "Ford Transit", "Citroën Business",
                          "Peugeot Pro", "Fiat Professional", "Iveco", "Renault Pro+")
 
-# Seuils validés statistiquement en section B :
+# Seuils retenus :
 seuil_retraite_age   <- 55
 seuil_neuf_km        <- 100
 seuil_occasion_km    <- 1000
@@ -227,7 +241,7 @@ copie <- d %>%
     
     
     # Vérifie la présence de NA sur la ligne en cours
-    flag_COM_valeur_manquante = if_any(everything(), is.na),
+    flag_COM_valeur_manquante = if_any(all_of(names(d)), is.na),
     # Seul days_past_due est flagué ici car l'analyse des pics a prouvé que seul cette var est affectée
     flag_COM_valeur_sentinelle_9999 = days_past_due == 9999,
     
@@ -243,7 +257,7 @@ copie <- d %>%
     
     
     flag_VAL_id_format = !grepl("^AUTO[0-9]{7}$", loan_id), 
-    # Dans le rapport on l'a mis dans la partie unicité car c'est un controôle sur la clé
+    # Dans le rapport, ce controle figure en partie 2 (Unicité) car il porte sur la clé, ici il reste en VAL
     flag_VAL_age_hors_18_80 = borrower_age < 18 | borrower_age > 80,
     flag_VAL_genre = !borrower_gender %in% genres_autorises,
     flag_VAL_modalites_hors_dico = !marital_status %in% statuts_maritaux_autorises |
@@ -346,7 +360,6 @@ synthese <- data.frame(
 rownames(synthese) <- NULL   # évite la colonne dupliquée dans les tableaux kable
 
 cat("\n SYNTHESE DES CONTROLES \n")
-print(synthese, row.names = FALSE)
 
 # Sortie d'un .csv avec le tableau des anomalies :
 # write.csv(synthese, "synthese_anomalies.csv", row.names = FALSE)
@@ -362,34 +375,6 @@ tableau_synthese <- synthese %>%
   ) 
 
 print(tableau_synthese)
-
-
-
-# Sensibilité des seuils (le diagnostic change-t-il si on deplace le seuil ?) :
-
-is_ret <- d$employment_status == "Retraité"
-
-sens_retraite <- map_dfr(c(55, 60, 62), function(s)
-  tibble(controle = "Retraités < seuil d'âge", seuil = s,
-         nb = sum(is_ret & d$borrower_age < s)))
-
-sens_km <- map_dfr(c(20000, 30000, 40000), function(s)
-  tibble(controle = "Occasion > seuil km/an", seuil = s,
-         nb = sum(copie$vehicle_condition == "Occasion" &
-                    copie$vehicle_age_years > 0 &
-                    copie$km_par_an > s, na.rm = TRUE)))
-
-sens_emploi <- map_dfr(c(3000, 5000, 8000), function(s)
-  tibble(controle = "Sans emploi, revenu > seuil", seuil = s,
-         nb = sum(d$employment_status == "Sans emploi" &
-                    d$monthly_net_income > s)))
-
-sensibilite <- bind_rows(sens_retraite, sens_km, sens_emploi) %>%
-  mutate(pct_base = round(100 * nb / nrow(d), 2))
-print(sensibilite, n = Inf)
-
-# Retraite = pente douce (8,2 % a 9,25 % de la base) on garde le 55 par sécurité, 
-# km/an = falaise entre 20k et 30k, sans emploi = plateau de 3k a 8k -> les seuils retenus sont robustes.
 
 
 
@@ -427,7 +412,7 @@ print(copie %>%
 cat("\n Incohérence métier : Retraités avec de l'ancienneté professionnelle :\n")
 print(copie %>% 
         filter(flag_COH_retraite_avec_anciennete) %>%
-        arrange(desc(job_seniority_years)) %>% # On montre les retraités avec 40 ans d'ancienneté "en cours"
+        arrange(desc(job_seniority_years)) %>% # On montre les retraités avec 45 ans d'ancienneté "en cours"
         select(loan_id, employment_status, borrower_age, job_seniority_years) %>% 
         head(3))
 
@@ -549,17 +534,6 @@ cat("Montant prêt incohérent :",
 
 cat("Retraités au total :", sum(is_ret), "\n")
 cat("dont ancienneté > 0 :", sum(is_ret & d$job_seniority_years > 0), "\n")
-print(sapply(c(55, 60, 62), function(s) sum(is_ret & d$borrower_age < s)))
-
-
-# Part de retraités par tranche d'âge (si elle est constante : statut sans lien avec l'âge)
-diag_ret <- d %>%
-  filter(borrower_age >= 18, borrower_age <= 80) %>%
-  mutate(tranche_age = cut(borrower_age, breaks = c(17, 25, 35, 45, 55, 65, 80))) %>%
-  group_by(tranche_age) %>%
-  summarise(nb = n(),
-            pct_retraites = round(100 * mean(employment_status == "Retraité"), 1))
-print(diag_ret)
 
 
 # Ancienneté déclarée : retraités vs autres statuts
@@ -592,13 +566,13 @@ cat("Incohérences défaut/DPD :", sum(inc_defaut), "\n")
 cat("dont loan_id dupliqué :", sum(inc_defaut & lignes_id_dupliquees),
     "(", round(100 * sum(inc_defaut & lignes_id_dupliquees) / sum(inc_defaut), 2), "%)\n")
 
-# # Les 3 exemples de la Figure 5 sont aussi des doublons de cle
+# Les 3 exemples de la Figure 5 sont aussi des doublons de clé
 ex5 <- c("AUTO0550150", "AUTO0094415", "AUTO0321974")
 print(d %>% filter(loan_id %in% ex5) %>%
         select(loan_id, monthly_net_income, days_past_due, default_flag) %>% arrange(loan_id))
 
 
-# Effectifs autour des bornes 18 et 80 :
+# Effectifs autour des bornes 18 et 80 
 effectifs_bornes_age <- sapply(c(17, 18, 19, 79, 80, 81), function(a) sum(d$borrower_age == a))
 names(effectifs_bornes_age) <- c(17, 18, 19, 79, 80, 81)
 print(effectifs_bornes_age)
