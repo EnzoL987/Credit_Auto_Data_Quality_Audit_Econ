@@ -1,21 +1,70 @@
 
 # AUDIT QUALITE DES DONNEES - PORTEFEUILLE DE CREDITS AUTO EUROPE
 
-# install.packages("tidyverse")
+# install.packages("tidyverse") 
 # install.packages("knitr")
 
-library(tidyverse)
+library(tidyverse) 
 library(knitr)
 
-options(scipen = 999)   # Permet d'éviter l'ecriture scientifique (1e+05) dans les sorties
+options(scipen = 999) # Permet d'éviter l'ecriture scientifique (1e+05) dans les sorties
 
 
-## 0. PARAMETRES DE L'ETUDE (issus du dictionnaire de données) :
+## I. IMPORT ET APERCU DE LA BASE :
 
 
-date_obs   <- as.Date("2024-12-31")   # date d'arrêt des données
-debut_prod <- as.Date("2020-01-01")   # début de la periode d'octroi
-fin_prod   <- as.Date("2022-12-31")   # fin de la période d'octroi
+# A. IMPORT :
+
+d <- read_csv("credit_auto_retail_europe.csv")
+dim_originale <- dim(d)
+
+cat("Lignes :", nrow(d), "| Colonnes :", ncol(d), "\n\n")
+
+
+# B. JUSTIFICATION DES PARAMÈTRES (Analyse de sensibilité) :
+
+# Avant de créer nos flags d'anomalies, nous justifions le choix de nos seuils 
+# métiers pour éviter de fixer des paramètres arbitraires.
+
+# Seuil d'âge pour les retraités
+is_ret <- d$employment_status == "Retraité"
+sens_retraite <- map_dfr(c(55, 60, 62), function(s)
+  tibble(controle = "Retraités < seuil d'âge", seuil = s,
+         nb = sum(is_ret & d$borrower_age < s, na.rm = TRUE)))
+
+# Seuil de kilométrage annuel pour les véhicules d'occasion
+temp_km_par_an <- ifelse(d$vehicle_age_years > 0, d$vehicle_mileage_km / d$vehicle_age_years, NA)
+
+sens_km <- map_dfr(c(20000, 30000, 40000), function(s)
+  tibble(controle = "Occasion > seuil km/an", seuil = s,
+         nb = sum(d$vehicle_condition == "Occasion" &
+                    d$vehicle_age_years > 0 &
+                    temp_km_par_an > s, na.rm = TRUE)))
+
+# Seuil de revenus pour les personnes sans emploi
+sens_emploi <- map_dfr(c(3000, 5000, 8000), function(s)
+  tibble(controle = "Sans emploi, revenu > seuil", seuil = s,
+         nb = sum(d$employment_status == "Sans emploi" &
+                    d$monthly_net_income > s, na.rm = TRUE)))
+
+# Bilan de la sensibilité
+sensibilite <- bind_rows(sens_retraite, sens_km, sens_emploi) %>%
+  mutate(pct_base = round(100 * nb / nrow(d), 2))
+
+cat("\nANALYSE DE SENSIBILITE DES SEUILS \n")
+print(as_tibble(sensibilite))
+
+# INTERPRETATION DES RESULTATS :
+# - Retraite = pente douce (8,2 % à 9,2 % de la base) -> on prend 55 ans par sécurité.
+# - Km/an = falaise (cassure) entre 20k et 30k -> on retient 30 000 km/an.
+# - Sans emploi = plateau entre 3k et 8k -> le seuil de 5 000 EUR est bon pour nous.
+
+
+# C. PARAMETRES DE L'ETUDE :
+
+date_obs   <- as.Date("2024-12-31")   
+debut_prod <- as.Date("2020-01-01")   
+fin_prod   <- as.Date("2022-12-31")   
 
 pays_autorises                 <- c("France", "Allemagne", "Italie", "Espagne", "Belgique",
                                     "Pays-Bas", "Portugal", "Pologne", "Autriche", "Irlande")
@@ -32,26 +81,14 @@ marques_utilitaires <- c("Volkswagen Utilitaires", "Opel Professional",
                          "Mercedes-Benz Vans", "Ford Transit", "Citroën Business",
                          "Peugeot Pro", "Fiat Professional", "Iveco", "Renault Pro+")
 
-
-
-
-## I. IMPORT ET APERCU DE LA BASE :
-
-
-# Le fichier credit_auto_retail_europe.csv doit être dans le répertoire de travail
-d <- read_csv("credit_auto_retail_europe.csv")
-dim_originale <- dim(d)
-
-
-cat("APERCU DE LA BASE \n")
-cat("Lignes :", nrow(d), "| Colonnes :", ncol(d), "\n\n")
-
-# Apercu des variables 
-str(d)
-
-# Apercu statistique des variables
-print(summary(d))
-
+# Seuils validés statistiquement en section B :
+seuil_retraite_age   <- 55
+seuil_neuf_km        <- 100
+seuil_occasion_km    <- 1000
+seuil_km_par_an      <- 30000
+seuil_revenu_max     <- 50000
+seuil_prix_max       <- 300000
+seuil_sans_emploi_rev <- 5000
 
 
 
@@ -142,11 +179,18 @@ dup_ligne <- duplicated(d) | duplicated(d, fromLast = TRUE)
 
 cat("\n UNICITE \n")
 
-cat("Lignes concernées (toutes occurrences) :", sum(lignes_id_dupliquees), "\n")
+# Identifiants et excédent de lignes
+cat("Identifiants distincts :", n_distinct(d$loan_id), 
+    "| Lignes en excès :", nrow(d) - n_distinct(d$loan_id), "\n")
 
-cat("Lignes strictement identiques (toutes colonnes) :", sum(dup_ligne), "\n")
+# Volume total de lignes polluées
+cat("Lignes totales concernées par les doublons :", sum(lignes_id_dupliquees), "\n")
 
-# Dénombre les identifiants qui ne respectent pas le format défini pour les ids -> mauvaise saisies.
+# Décomposition de la pollution (La somme des deux donne le total ci-dessus)
+cat("   -> Dont lignes strictement identiques (doublons parfaits) :", sum(dup_ligne), "\n")
+cat("   -> Dont conflits de clé (même loan_id, contenu différent) :", sum(lignes_id_dupliquees & !dup_ligne), "\n")
+
+# Erreurs de format sur la clé primaire
 cat("Identifiants au mauvais format (AUTO + 7 chiffres) :", sum(!grepl("^AUTO[0-9]{7}$", d$loan_id)), "\n")
 
 
@@ -174,15 +218,18 @@ copie <- d %>%
     taux_mensuel = interest_rate_pct / 100 / 12,
     # Mensualite theorique (formule d'amortissement) : NA si le taux est hors domaine
     mensualite_theo = ifelse(taux_mensuel > 0,
-                               loan_amount * taux_mensuel / (1 - (1 + taux_mensuel)^(-loan_term_months)),
-                               NA_real_),
+                             loan_amount * taux_mensuel / (1 - (1 + taux_mensuel)^(-loan_term_months)),
+                             NA_real_),
     km_par_an = ifelse(vehicle_age_years > 0, vehicle_mileage_km / vehicle_age_years, NA),
     
     
     ## 1. COMPLETUDE :
     
-    flag_COM_valeur_manquante = rowSums(is.na(d)) > 0,
-    flag_COM_valeur_sentinelle_9999 = days_past_due == 9999, # Faux NA identifiés dans la première partie
+    
+    # Vérifie la présence de NA sur la ligne en cours
+    flag_COM_valeur_manquante = if_any(everything(), is.na),
+    # Seul days_past_due est flagué ici car l'analyse des pics a prouvé que seul cette var est affectée
+    flag_COM_valeur_sentinelle_9999 = days_past_due == 9999,
     
     
     ## 2. UNICITE :
@@ -233,17 +280,17 @@ copie <- d %>%
     flag_COH_ltv_incoherent = abs(loan_amount / vehicle_price - ltv_ratio) > 0.001,
     # Mensualite vs formule d'amortissement classique (tolerance 1 %), NA si non calculable
     flag_COH_mensualite_incoherente = ifelse(!is.na(mensualite_theo),
-                                                  abs(mensualite_theo - monthly_installment) / mensualite_theo > 0.01, NA),
+                                             abs(mensualite_theo - monthly_installment) / mensualite_theo > 0.01, NA),
     # Definition du defaut : >= 90 jours de retard
     # On exclut le code sentinelle 9999 de l'analyse des vrais retards
     flag_COH_dpd_ge90_mais_sain = days_past_due >= 90 & days_past_due != 9999 & default_flag == 0,
     flag_COH_defaut_mais_dpd_lt90 = days_past_due < 90 & days_past_due != 9999 & default_flag == 1,
     flag_COH_neuf_avec_age_positif = vehicle_condition == "Neuf" & vehicle_age_years > 0,
     flag_COH_occasion_age_zero = vehicle_condition == "Occasion" & vehicle_age_years == 0,
-    flag_COH_neuf_km_sup_100 = vehicle_condition == "Neuf" & vehicle_mileage_km > 100,
+    flag_COH_neuf_km_sup_100 = vehicle_condition == "Neuf" & vehicle_mileage_km > seuil_neuf_km,
     flag_COH_type_vs_marque = (vehicle_type == "Véhicule particulier" & vehicle_brand %in% marques_utilitaires) |
       (vehicle_type == "Véhicule utilitaire" & !vehicle_brand %in% marques_utilitaires),
-    flag_COH_retraite_moins_de_55_ans = employment_status == "Retraité" & borrower_age < 55,
+    flag_COH_retraite_moins_de_55_ans = employment_status == "Retraité" & borrower_age < seuil_retraite_age,
     flag_COH_ancien_debut_avant_16_ans = borrower_age - job_seniority_years < 16,
     flag_COH_sans_emploi_avec_anciennete = employment_status == "Sans emploi" & job_seniority_years > 0,
     flag_COH_retraite_avec_anciennete = employment_status == "Retraité" & job_seniority_years > 0, 
@@ -258,12 +305,12 @@ copie <- d %>%
     ## 5. EXACTITUDE / PLAUSIBILITE :
     
     
-    flag_PLA_revenu_aberrant = monthly_net_income <= 0 | monthly_net_income > 50000,
-    flag_PLA_sans_emploi_revenu_sup_5000 = employment_status == "Sans emploi" & monthly_net_income > 5000,
-    flag_PLA_prix_extreme_sup_300000 = vehicle_price > 300000,
+    flag_PLA_revenu_aberrant = monthly_net_income <= 0 | monthly_net_income > seuil_revenu_max,
+    flag_PLA_sans_emploi_revenu_sup_5000 = employment_status == "Sans emploi" & monthly_net_income > seuil_sans_emploi_rev,
+    flag_PLA_prix_extreme_sup_300000 = vehicle_price > seuil_prix_max,
     flag_PLA_pret_sup_140000 = loan_amount > 140000,   
-    flag_PLA_occasion_km_par_an_sup_30000 = vehicle_condition == "Occasion" & vehicle_age_years > 0 & km_par_an > 30000,
-    flag_PLA_occasion_km_inf_1000 = vehicle_condition == "Occasion" & vehicle_age_years > 0 & vehicle_mileage_km < 1000,
+    flag_PLA_occasion_km_par_an_sup_30000 = vehicle_condition == "Occasion" & vehicle_age_years > 0 & km_par_an > seuil_km_par_an,
+    flag_PLA_occasion_km_inf_1000 = vehicle_condition == "Occasion" & vehicle_age_years > 0 & vehicle_mileage_km < seuil_occasion_km,
     
     
     ## 6. FRAICHEUR / COHERENCE TEMPORELLE :
@@ -315,6 +362,34 @@ tableau_synthese <- synthese %>%
   ) 
 
 print(tableau_synthese)
+
+
+
+# Sensibilité des seuils (le diagnostic change-t-il si on deplace le seuil ?) :
+
+is_ret <- d$employment_status == "Retraité"
+
+sens_retraite <- map_dfr(c(55, 60, 62), function(s)
+  tibble(controle = "Retraités < seuil d'âge", seuil = s,
+         nb = sum(is_ret & d$borrower_age < s)))
+
+sens_km <- map_dfr(c(20000, 30000, 40000), function(s)
+  tibble(controle = "Occasion > seuil km/an", seuil = s,
+         nb = sum(copie$vehicle_condition == "Occasion" &
+                    copie$vehicle_age_years > 0 &
+                    copie$km_par_an > s, na.rm = TRUE)))
+
+sens_emploi <- map_dfr(c(3000, 5000, 8000), function(s)
+  tibble(controle = "Sans emploi, revenu > seuil", seuil = s,
+         nb = sum(d$employment_status == "Sans emploi" &
+                    d$monthly_net_income > s)))
+
+sensibilite <- bind_rows(sens_retraite, sens_km, sens_emploi) %>%
+  mutate(pct_base = round(100 * nb / nrow(d), 2))
+print(sensibilite, n = Inf)
+
+# Retraite = pente douce (8,2 % a 9,25 % de la base) on garde le 55 par sécurité, 
+# km/an = falaise entre 20k et 30k, sans emploi = plateau de 3k a 8k -> les seuils retenus sont robustes.
 
 
 
@@ -389,33 +464,60 @@ print(table(format(copie$date_octroi, "%Y")))
 
 #  Qu'est-ce qu'il se passe si on ne tient pas compte de ces problemes ?
 
-# On prend toutes les anomalies de qualité des données
-flags_donnees <- copie %>%
-  select(starts_with("flag_")) 
 
-copie$nb_anomalies <- rowSums(flags_donnees, na.rm = TRUE)
+copie$nb_anomalies <- rowSums(flags, na.rm = TRUE)
 copie$au_moins_une <- copie$nb_anomalies > 0
+
+cat("\n BILAN GLOBAL \n")
 
 
 # Hors contrôles de statut pro (structurels : ils touchent presque toute une modalité)
-fl_sans_statut <- flags_donnees %>%
+fl_sans_statut <- flags %>%
   select(-flag_COH_retraite_avec_anciennete, -flag_COH_retraite_moins_de_55_ans,
          -flag_COH_sans_emploi_avec_anciennete)
 cat("% >= 1 anomalie hors contrôles de statut :", round(100 * mean(rowSums(fl_sans_statut, na.rm = TRUE) > 0), 2), "\n")
 
 
 
+cat("Bilan global :", sum(copie$au_moins_une), "dossiers, soit",
+    round(100 * mean(copie$au_moins_une), 2), "% de la base\n")
+
+
+
 cat("\n IMPACT DES ANOMALIES \n")
 
 
+# Impact des anomalies sur le défaut :
 cat("\nTaux de defaut selon la presence d'une anomalie de donnee :\n")
 print(copie %>% group_by(au_moins_une) %>%
         summarise(nb = n(), taux_defaut_pct = round(100 * mean(default_flag), 2)))
 
 
-cat("Bilan global :", sum(copie$au_moins_une), "dossiers, soit",
-    round(100 * mean(copie$au_moins_une), 2), "% de la base\n")
+# L'ecart ci-dessus est en partie mecanique : flag_COH_defaut_mais_dpd_lt90
+# exige default_flag == 1. On refait la comparaison sans les 2 flags lies a default_flag.
+cat("\nTaux de defaut hors incoherences defaut/DPD :\n")
 
+flags_circ <- c("flag_COH_dpd_ge90_mais_sain", "flag_COH_defaut_mais_dpd_lt90")
+
+copie$au_moins_une_hors_defaut <- rowSums(
+  flags %>% select(-all_of(flags_circ)), na.rm = TRUE) > 0
+
+print(copie %>% group_by(au_moins_une_hors_defaut) %>%
+        summarise(nb = n(), taux_defaut_pct = round(100 * mean(default_flag), 2)))
+
+# Variante : sans non plus les controles de statut pro (ils touchent presque toute une modalite)
+cat("\nTaux de defaut hors incoherences defaut/DPD et hors statut pro :\n")
+
+copie$au_moins_une_propre <- rowSums(
+  fl_sans_statut %>% select(-all_of(flags_circ)), na.rm = TRUE) > 0
+
+print(copie %>% group_by(au_moins_une_propre) %>%
+        summarise(nb = n(), taux_defaut_pct = round(100 * mean(default_flag), 2)))
+
+
+
+
+# Recoupement et repartition par dimension :
 
 # nb_anomalies compte des FLAGS, pas des erreurs distinctes (une même erreur peut déclencher plusieurs flags). 
 
@@ -426,8 +528,8 @@ cat("Valeurs négatives (union) :", sum(copie$flag_VAL_dpd_negatif | copie$flag_
 # Tableau de synthèse par dimension (lignes distinctes)
 dims <- c("COM","UNI","VAL","COH","PLA","TMP")
 mat_dim <- sapply(dims, function(p) {
-  cols <- grepl(paste0("^flag_", p, "_"), names(flags_donnees))
-  rowSums(flags_donnees[, cols, drop = FALSE], na.rm = TRUE) > 0
+  cols <- grepl(paste0("^flag_", p, "_"), names(flags))
+  rowSums(flags[, cols, drop = FALSE], na.rm = TRUE) > 0
 })
 
 copie$nb_dimensions <- rowSums(mat_dim)
@@ -443,7 +545,8 @@ cat("Montant prêt incohérent :",
     sum(copie$flag_COH_pret_diff_prix_moins_apport | copie$flag_COH_ltv_incoherent), "\n")
 
 
-is_ret <- d$employment_status == "Retraité"
+# Diagnostic du statut professionnel :
+
 cat("Retraités au total :", sum(is_ret), "\n")
 cat("dont ancienneté > 0 :", sum(is_ret & d$job_seniority_years > 0), "\n")
 print(sapply(c(55, 60, 62), function(s) sum(is_ret & d$borrower_age < s)))
@@ -481,24 +584,26 @@ print(summary_statut)
 # sont plus particulièrement associés aux défauts.
 
 
-cat("Identifiants distincts :", n_distinct(d$loan_id), "| lignes en excès :", nrow(d) - n_distinct(d$loan_id), "\n")
+# Autres chiffres importants :
 
-cat("Conflits de clé (même loan_id, contenu différent) :", sum(lignes_id_dupliquees & !dup_ligne), "\n")
-
-
+# Incoherences defaut/DPD 
 inc_defaut <- copie$flag_COH_dpd_ge90_mais_sain | copie$flag_COH_defaut_mais_dpd_lt90
 cat("Incohérences défaut/DPD :", sum(inc_defaut), "\n")
 cat("dont loan_id dupliqué :", sum(inc_defaut & lignes_id_dupliquees),
     "(", round(100 * sum(inc_defaut & lignes_id_dupliquees) / sum(inc_defaut), 2), "%)\n")
 
-# Vérification ponctuelle
+# # Les 3 exemples de la Figure 5 sont aussi des doublons de cle
 ex5 <- c("AUTO0550150", "AUTO0094415", "AUTO0321974")
 print(d %>% filter(loan_id %in% ex5) %>%
         select(loan_id, monthly_net_income, days_past_due, default_flag) %>% arrange(loan_id))
 
 
-print(sapply(c(17, 18, 19, 79, 80, 81), function(a) sum(d$borrower_age == a)))   # pic à 18 ans
+# Effectifs autour des bornes 18 et 80 :
+effectifs_bornes_age <- sapply(c(17, 18, 19, 79, 80, 81), function(a) sum(d$borrower_age == a))
+names(effectifs_bornes_age) <- c(17, 18, 19, 79, 80, 81)
+print(effectifs_bornes_age)
 
+# Conclusion du rapport
 cat("% de dossiers anormaux touchant >= 2 dimensions :", round(100 * mean(copie$nb_dimensions[copie$au_moins_une] >= 2), 1), "\n")
 
 cat("Embauche après octroi ET conflit d'ancienneté :", sum(copie$flag_TMP_debut_emploi_apres_octroi & copie$flag_TMP_anciennete_vs_dates), "\n")
