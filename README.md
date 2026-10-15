@@ -19,15 +19,15 @@ graph TD
     %% Source
     A[(Auto Credit Database <br/> 800,000+ records)]:::blue --> B[Data Import and Typing]:::white
 
-    %% Audit des 6 dimensions
+    %% Audit of the 6 dimensions
     B --> C[Data Quality Audit]:::light
     
-    C --> D[Completeness and Uniqueness]:::purple
-    C --> E[Validity of Domains]:::purple
-    C --> F[Cross-Functional & Business Alignment]:::purple
-    C --> G[Tests]:::purple
+    C --> D[1. Completeness & 2. Uniqueness]:::purple
+    C --> E[3. Validity of Domains]:::purple
+    C --> F[4. Cross-Field Consistency]:::purple
+    C --> G[5. Plausibility & 6. Temporal]:::purple
 
-    %% Rapport
+    %% Report
     D --> H((Final Audit Report)):::green
     E --> H
     F --> H
@@ -44,36 +44,35 @@ graph TD
 
 ## 🎯 Audit Scope and Quality Dimensions
 
-The audit is structured around the 7 specific quality and risk dimensions coded in the analysis:
+The audit is structured around the 6 specific quality and risk dimensions coded in the analysis:
 
 1. **Completeness:** 
-   * Detection of missing values (`NA`) and blank/empty string entries across all columns .
+   * Detection of missing values (`NA`) and blank/empty string entries across all columns.
+   * Identification of sentinel values masking as data, specifically `9999` for the `days_past_due` variable.
 2. **Uniqueness:** 
-   * Identification of multi-column duplicate rows and primary key (`loan_id`) conflicts or overlaps .
+   * Identification of multi-column duplicate rows and primary key (`loan_id`) conflicts or overlaps.
 3. **Validity:** 
-   * Verification of values against the data dictionary domains, including `loan_id` format ("AUTO" + 7 digits), borrower age bounds (18-80), accepted country/status lists, and interest rate thresholds .
+   * Verification of values against the data dictionary domains, including `loan_id` format ("AUTO" + 7 digits), borrower age bounds (18-80), accepted country/status lists, and interest rate thresholds (1.5% to 15%).
 4. **Cross-Field Consistency:** 
-   * Financial arithmetic: Validating that $\text{Loan Amount} = \text{Vehicle Price} - \text{Down Payment}$ and $\text{LTV} = \frac{\text{Loan Amount}}{\text{Vehicle Price}}$ .
-   * Actuarial checks: Comparing the reported monthly installment against the theoretical amortization formula .
-   * Regulatory logic: Validating the default status (`default_flag`) against the 90-day arrears threshold (`days_past_due`) .
-   * Physical & Professional logic: Verifying vehicle condition ("Neuf" having 0 years and <100 km) and employment age logic (e.g., no retirees under 55) .
+   * Financial arithmetic: Validating that $\text{Loan Amount} = \text{Vehicle Price} - \text{Down Payment}$ and $\text{LTV} = \frac{\text{Loan Amount}}{\text{Vehicle Price}}$.
+   * Actuarial checks: Comparing the reported monthly installment against the theoretical amortization formula.
+   * Regulatory logic: Validating the default status (`default_flag`) against the 90-day arrears threshold (`days_past_due >= 90`).
+   * Professional logic: Ensuring consistency between employment status and job seniority (e.g., retirees with active seniority).
 5. **Accuracy & Plausibility:** 
-   * Flagging extreme business outliers, such as net incomes over €50k, vehicle prices over €300k, or abnormally high mileage for used cars .
-6. **Solvency (Risk Assessment):** 
-   * Financial health checks detecting if the monthly installment exceeds the net income, or if the total debt ratio crosses critical thresholds (35%, 60%, or 100%) .
-7. **Freshness & Temporal Consistency:** 
-   * Verifying that loan origination dates fall within the expected 2020–2022 production window .
-   * Ensuring chronological logic, such as employment starting before the loan origination, and reconciling calculated career duration against declared job seniority .
+   * Flagging extreme business outliers, such as net incomes over €50,000, vehicle prices over €300,000, or abnormally high mileage for used cars (> 30,000 km/year).
+6. **Freshness & Temporal Consistency:** 
+   * Verifying that loan origination dates fall within the expected 2020–2022 production window.
+   * Ensuring chronological logic, such as employment starting before the loan origination, and reconciling calculated career duration against declared job seniority.
 
 ## 🛠️ Technologies & Tools
 * **Language:** R
-* **Environment:** RStudio.
-* **Core Packages:** `tidyverse` (`dplyr`, `ggplot2`), `knitr`, and `kableExtra` for executive summary tables.
+* **Environment:** RStudio
+* **Core Packages:** `tidyverse` (`dplyr`, `ggplot2`), `knitr` for executive summary tables.
 
 ## 📂 Repository Structure
-* `Rapport_Projet_Lillian_Enzo.R`: The automated R audit script containing all data wrangling, validation flags, statistical tests (Chi-square, Wilcoxon), and ggplot2 visual reporting.
-* `credit_auto_retail_europe.csv`: The audit dataset of over 802,800 retail auto credit files.
+* `Rapport_Projet_Lillian_Enzo.R`: The automated R audit script containing all data wrangling, validation flags, sensitivity analysis, and `ggplot2` visual reporting.
+* `credit_auto_retail_europe.csv`: The audit dataset of retail auto credit files.
 * `dictionnaire donnees_Projet_Etude_R.pdf`: The official data dictionary guiding the validity thresholds.
+* `TDR_EnzoL_LillianC.pdf`: The final management report outlining the data quality assessment and risk impacts.
 
-
-🌍 Note : The final PDF report TBH.pdf is written in French. However, I would be more than happy to discuss the methodology, the code, or the results in English! Feel free to reach out.
+🌍 *Note: The final PDF report `TDR_EnzoL_LillianC.pdf` is written in French. However, I would be more than happy to discuss the methodology, the code, or the results in English! Feel free to reach out.*
