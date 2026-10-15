@@ -25,10 +25,10 @@ graph TD
     C --> D[Completeness & Uniqueness]:::purple
     C --> E[Validity of Domains]:::purple
     C --> F[Cross-Field Consistency]:::purple
-    C --> G[Plausibility]:::purple
+    C --> G[Plausibility & Temporal]:::purple
 
     %% Report
-    D --> H((Final Report)):::green
+    D --> H((Final Audit Report)):::green
     E --> H
     F --> H
     G --> H
