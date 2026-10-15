@@ -22,13 +22,13 @@ graph TD
     %% Audit of the 6 dimensions
     B --> C[Data Quality Audit]:::light
     
-    C --> D[1. Completeness & 2. Uniqueness]:::purple
-    C --> E[3. Validity of Domains]:::purple
-    C --> F[4. Cross-Field Consistency]:::purple
-    C --> G[5. Plausibility & 6. Temporal]:::purple
+    C --> D[Completeness & Uniqueness]:::purple
+    C --> E[Validity of Domains]:::purple
+    C --> F[Cross-Field Consistency]:::purple
+    C --> G[Plausibility]:::purple
 
     %% Report
-    D --> H((Final Audit Report)):::green
+    D --> H((Final Report)):::green
     E --> H
     F --> H
     G --> H
@@ -71,8 +71,8 @@ The audit is structured around the 6 specific quality and risk dimensions coded 
 
 ## 📂 Repository Structure
 * `Rapport_Projet_Lillian_Enzo.R`: The automated R audit script containing all data wrangling, validation flags, sensitivity analysis, and `ggplot2` visual reporting.
+* * `TDR_EnzoL_LillianC.pdf`: The final management report outlining the data quality assessment and risk impacts.
 * `credit_auto_retail_europe.csv`: The audit dataset of retail auto credit files.
 * `dictionnaire donnees_Projet_Etude_R.pdf`: The official data dictionary guiding the validity thresholds.
-* `TDR_EnzoL_LillianC.pdf`: The final management report outlining the data quality assessment and risk impacts.
 
-🌍 *Note: The final PDF report `TDR_EnzoL_LillianC.pdf` is written in French. However, I would be more than happy to discuss the methodology, the code, or the results in English! Feel free to reach out.*
+🌍 *Note: These documents are written in French. However, I would be more than happy to discuss the methodology, the code, or the results in English! Feel free to reach out.*
